@@ -1,0 +1,7 @@
+commodity_id,commodity_name,hindi_name,marathi_name,category,msp_price_inr,current_avg_price_inr,seasonal_demand_index,varieties
+wheat,Wheat (गहू / गेहूं),गेहूं,गहू,Cereals,2275,2480,0.85,Lokwan;Sharbati;Tukdi;Kalyansona
+soyabean,Soyabean (सोयाबीन),सोयाबीन,सोयाबीन,Oilseeds,4892,5150,0.92,Yellow Soyabean;JS-335;JS-9305
+onion,Onion (कांदा / प्याज),प्याज,कांदा,Vegetables,1850,2850,0.78,Garwa (Summer);Pol (Kharif);Rangada
+cotton,Cotton (कापूस / कपास),कपास,कापूस,Cash Crops,7121,7450,0.88,Medium Staple;Long Staple;Bt Cotton
+chana,Gram / Chana (हरभरा / चना),चना,हरभरा,Pulses,5440,5820,0.72,Desi Chana;Kabuli Chana;Vijay
+tomato,Tomato (टोमॅटो / टमाटर),टमाटर,टोमॅटो,Vegetables,1400,2100,0.65,Abhinav;Vaishali;Hybrid Red

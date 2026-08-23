@@ -1,0 +1,9 @@
+mandi_id,mandi_name,district,state,distance_km,modal_price_per_qtl,min_price,max_price,daily_arrival_quintals,arrival_trend_percent,mandi_cess_percent,avg_handling_cost_per_qtl,cold_storage_available,wdra_storage_capacity_quintals,latitude,longitude
+lasalgaon,Lasalgaon APMC Market,Nashik,Maharashtra,38,2480,2350,2610,12450,14.5,1.05,18,true,45000,20.1472,74.2272
+pimpalgaon,Pimpalgaon Baswant APMC,Nashik,Maharashtra,28,2460,2320,2580,9800,8.2,1.00,16,true,30000,20.1697,73.9856
+nashik_main,Nashik Main APMC Yard,Nashik,Maharashtra,18,2440,2290,2540,15200,-3.4,1.10,20,false,15000,19.9975,73.7898
+yeola,Yeola APMC Sub-Yard,Nashik,Maharashtra,64,2420,2280,2520,6700,2.1,0.95,15,false,20000,20.0423,74.4883
+vashi_navi_mumbai,Vashi APMC Mega Terminal,Mumbai,Maharashtra,175,2620,2490,2780,34000,18.0,1.25,25,true,120000,19.0760,72.9977
+pune_gultekdi,Pune Gultekdi Market Yard,Pune,Maharashtra,195,2580,2440,2720,28500,12.3,1.15,22,true,85000,18.4986,73.8679
+surat_apmc,Surat APMC Mandi,Surat,Gujarat,240,2640,2510,2810,21000,6.7,1.00,20,true,95000,21.1702,72.8311
+indore_devi_ahilya,Indore Devi Ahilya APMC,Indore,Madhya Pradesh,390,2690,2550,2890,42000,22.4,1.50,24,true,150000,22.7196,75.8577
