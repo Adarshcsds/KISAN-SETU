@@ -4,10 +4,10 @@ import psycopg2
 
 
 DB_CONFIG = {
-    "host": "localhost",
-    "port": 5432,
-    "database": "kisanmitra",
-    "user": "postgres",
+    "host": os.getenv("DB_HOST", "localhost"),
+    "port": int(os.getenv("DB_PORT", "5432")),
+    "database": os.getenv("DB_NAME", "kisanmitra"),
+    "user": os.getenv("DB_USER", "postgres"),
     "password": os.getenv("DB_PASSWORD", "KisanMitra123"),
 }
 
@@ -147,6 +147,22 @@ def initialize_auth_schema():
                     END IF;
                 END $$
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS logistics_shipments (
+                    id UUID PRIMARY KEY,
+                    trade_deal_id UUID NOT NULL UNIQUE REFERENCES trade_deals(id) ON DELETE CASCADE,
+                    provider_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                    transporter_name VARCHAR(200), truck_type VARCHAR(120), license_plate VARCHAR(40),
+                    driver_name VARCHAR(120), driver_phone VARCHAR(20), distance_km NUMERIC(10,2),
+                    freight_amount NUMERIC(14,2), gate_pass_id VARCHAR(40) UNIQUE,
+                    status VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE'
+                        CHECK (status IN ('AVAILABLE','ACCEPTED','DISPATCHED','IN_TRANSIT','DELIVERED','COMPLETED')),
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    dispatched_at TIMESTAMPTZ, delivered_at TIMESTAMPTZ
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_logistics_shipments_provider ON logistics_shipments(provider_id, status)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_logistics_shipments_status ON logistics_shipments(status)")
         conn.commit()
     finally:
         conn.close()
