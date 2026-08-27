@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Role, User } from '../../types';
+import { Role } from '../../types';
 import { 
   X, 
   User as UserIcon, 
@@ -27,7 +27,6 @@ export const AuthModal: React.FC = () => {
     setIsAuthModalOpen, 
     authModalMode, 
     setAuthModalMode, 
-    usersList, 
     loginUser, 
     registerUser, 
     t 
@@ -53,7 +52,15 @@ export const AuthModal: React.FC = () => {
   const [regState, setRegState] = useState<string>('Maharashtra');
   const [regFarmSize, setRegFarmSize] = useState<number>(6.5);
   const [regCompanyName, setRegCompanyName] = useState<string>('');
-  const [regGstNumber, setRegGstNumber] = useState<string>('');
+  const [regPinCode, setRegPinCode] = useState<string>('');
+  const [regCrops, setRegCrops] = useState<string>('');
+  const [regCropCategory, setRegCropCategory] = useState<string>('Grain');
+  const [regBuyerType, setRegBuyerType] = useState<string>('');
+  const [regWarehouseAvailable, setRegWarehouseAvailable] = useState<boolean>(false);
+  const [regColdStorageAvailable, setRegColdStorageAvailable] = useState<boolean>(false);
+  const [regVehicleTypes, setRegVehicleTypes] = useState<string>('');
+  const [regVehicleCapacity, setRegVehicleCapacity] = useState<string>('');
+  const [regServiceAreas, setRegServiceAreas] = useState<string>('');
   const [regPassword, setRegPassword] = useState<string>('');
   const [regConfirmPassword, setRegConfirmPassword] = useState<string>('');
 
@@ -87,7 +94,7 @@ export const AuthModal: React.FC = () => {
   if (!isAuthModalOpen) return null;
 
   // Handle Login Submit
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -98,21 +105,15 @@ export const AuthModal: React.FC = () => {
       return;
     }
 
-    // Find User
-    const foundUser = usersList.find(
-      u => u.phone === identifier.trim() || (u.email && u.email.toLowerCase() === identifier.trim().toLowerCase())
-    );
-
-    if (!foundUser) {
-      setErrorMsg('No registered account found with this Phone Number or Email.');
-      return;
+    try {
+      await loginUser(identifier.trim(), password);
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : 'Unable to sign in.');
     }
-
-    loginUser(foundUser);
   };
 
   // Handle Register Submit
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -121,8 +122,8 @@ export const AuthModal: React.FC = () => {
       return;
     }
 
-    if (regPassword.length < 4) {
-      setErrorMsg('Password must be at least 4 characters long.');
+    if (regPassword.length < 8) {
+      setErrorMsg('Password must be at least 8 characters long.');
       return;
     }
 
@@ -138,27 +139,18 @@ export const AuthModal: React.FC = () => {
       return;
     }
 
-    // Check if phone already registered
-    const existing = usersList.find(u => u.phone === regPhone.trim());
-    if (existing) {
-      setErrorMsg('An account with this phone number already exists. Please login instead.');
-      return;
+    const baseProfile = { district: regDistrict, state: regState, pinCode: regPinCode.trim() };
+    const profile = regRole === 'farmer'
+      ? { ...baseProfile, location: regLocation.trim(), farmSizeAcres: regFarmSize, primaryCrop: regCrops.split(',')[0]?.trim(), crops: regCrops.split(',').map(name => name.trim()).filter(Boolean).map((name, index) => ({ name, category: regCropCategory, isPrimary: index === 0 })) }
+      : regRole === 'buyer'
+        ? { ...baseProfile, firmName: regCompanyName.trim(), businessType: regBuyerType.trim(), address: regLocation.trim() }
+        : { ...baseProfile, firmName: regCompanyName.trim(), address: regLocation.trim(), warehouseAvailable: regWarehouseAvailable, coldStorageAvailable: regColdStorageAvailable, vehicleTypes: regVehicleTypes.split(',').map(value => value.trim()).filter(Boolean), vehicleCapacity: regVehicleCapacity.trim(), serviceAreas: regServiceAreas.split(',').map(value => value.trim()).filter(Boolean) };
+    try {
+      const created = await registerUser({ name: regName.trim(), phone: regPhone.trim(), email: regEmail.trim(), role: regRole, password: regPassword, profile });
+      setSuccessMsg(`Welcome to KisanSetu, ${created.name}! Your account is now active.`);
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : 'Unable to create account.');
     }
-
-    const created = registerUser({
-      name: regName.trim(),
-      phone: regPhone.trim(),
-      email: regEmail.trim(),
-      role: regRole,
-      location: regLocation.trim() || `${regDistrict} Rural`,
-      district: regDistrict,
-      state: regState,
-      farmSizeAcres: regFarmSize,
-      companyName: regCompanyName.trim(),
-      gstNumber: regGstNumber.trim(),
-    });
-
-    setSuccessMsg(`Welcome to KisanSetu, ${created.name}! Your account is now active.`);
   };
 
   // Handle Send OTP for Password Reset
@@ -167,16 +159,7 @@ export const AuthModal: React.FC = () => {
       setErrorMsg('Please enter your registered mobile number.');
       return;
     }
-    const found = usersList.find(u => u.phone === resetPhone.trim());
-    if (!found) {
-      setErrorMsg('Mobile number not found in registered accounts.');
-      return;
-    }
-    const mockOtp = String(Math.floor(1000 + Math.random() * 9000));
-    setGeneratedOtp(mockOtp);
-    setOtpSent(true);
-    setErrorMsg('');
-    setSuccessMsg(`OTP sent to +91 ${resetPhone}. (Demo OTP Code: ${mockOtp})`);
+    setErrorMsg('Password reset is not configured yet. Please contact platform support.');
   };
 
   // Handle Password Reset Confirm
@@ -191,10 +174,7 @@ export const AuthModal: React.FC = () => {
       return;
     }
 
-    const found = usersList.find(u => u.phone === resetPhone.trim());
-    if (found) {
-      loginUser(found);
-    }
+    setErrorMsg('Password reset is not configured yet. Please contact platform support.');
   };
 
   return (
@@ -372,30 +352,9 @@ export const AuthModal: React.FC = () => {
               <ArrowRight className="w-4 h-4" />
             </button>
 
-            {/* Quick Demo Test Logins */}
-            <div className="pt-3 border-t border-[#E5E7EB] space-y-2">
-              <div className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider text-center">
-                Or Quick Test with Pre-Configured Profiles
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {usersList.slice(0, 4).map((usr) => (
-                  <button
-                    type="button"
-                    key={usr.id}
-                    onClick={() => loginUser(usr)}
-                    className="p-2 rounded-lg bg-[#F9FAFB] hover:bg-[#F3F4F6] border border-[#E5E7EB] text-left text-xs transition cursor-pointer"
-                  >
-                    <div className="font-bold text-[#1F2937] flex items-center space-x-1">
-                      <span>{usr.avatarUrl}</span>
-                      <span className="truncate">{usr.name.split(' ')[0]}</span>
-                    </div>
-                    <div className="text-[10px] text-[#4B5563] capitalize truncate font-medium">
-                      {usr.role === 'farmer' ? `Farmer (${usr.district})` : usr.companyName || usr.role}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <p className="pt-3 border-t border-[#E5E7EB] text-center text-[10px] text-[#6B7280]">
+              Sign in with an account registered through KisanSetu. Demo records cannot authenticate.
+            </p>
 
           </form>
         )}
@@ -413,7 +372,7 @@ export const AuthModal: React.FC = () => {
                 {[
                   { role: 'farmer' as Role, label: '👨‍🌾 Farmer (शेतकरी)' },
                   { role: 'buyer' as Role, label: '🏢 Buyer (खरेदीदार)' },
-                  { role: 'fpo' as Role, label: '👥 FPO (समूह)' },
+                  { role: 'logistics' as Role, label: '🚚 Logistics' },
                 ].map((r) => (
                   <button
                     type="button"
@@ -463,6 +422,14 @@ export const AuthModal: React.FC = () => {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input type="email" value={regEmail} onChange={(e) => setRegEmail(e.target.value)} placeholder="Email address" className="w-full bg-white border border-[#D1D5DB] rounded-xl px-3 py-2 text-xs text-[#1F2937]" required />
+              <input type="text" value={regLocation} onChange={(e) => setRegLocation(e.target.value)} placeholder={regRole === 'farmer' ? 'Farm location / address' : 'Business address'} className="w-full bg-white border border-[#D1D5DB] rounded-xl px-3 py-2 text-xs text-[#1F2937]" required />
+              <input type="text" value={regDistrict} onChange={(e) => setRegDistrict(e.target.value)} placeholder="District" className="w-full bg-white border border-[#D1D5DB] rounded-xl px-3 py-2 text-xs text-[#1F2937]" required />
+              <input type="text" value={regState} onChange={(e) => setRegState(e.target.value)} placeholder="State" className="w-full bg-white border border-[#D1D5DB] rounded-xl px-3 py-2 text-xs text-[#1F2937]" required />
+              <input type="text" value={regPinCode} onChange={(e) => setRegPinCode(e.target.value)} placeholder="PIN code" className="w-full bg-white border border-[#D1D5DB] rounded-xl px-3 py-2 text-xs text-[#1F2937]" required />
+            </div>
+
             {/* Conditional Role-Specific Fields */}
             {regRole === 'farmer' && (
               <div className="grid grid-cols-2 gap-3 bg-[#F9FAFB] p-3 rounded-xl border border-[#E5E7EB]">
@@ -496,6 +463,15 @@ export const AuthModal: React.FC = () => {
                     className="w-full bg-white border border-[#D1D5DB] rounded-lg px-2.5 py-1.5 text-xs text-[#15803D] font-mono font-bold"
                   />
                 </div>
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-bold text-[#6B7280] mb-1">Crops (comma separated) and category</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input type="text" value={regCrops} onChange={(e) => setRegCrops(e.target.value)} placeholder="e.g. Wheat, Onion" className="w-full bg-white border border-[#D1D5DB] rounded-lg px-2.5 py-1.5 text-xs" required />
+                    <select value={regCropCategory} onChange={(e) => setRegCropCategory(e.target.value)} className="w-full bg-white border border-[#D1D5DB] rounded-lg px-2.5 py-1.5 text-xs">
+                      {['Vegetable', 'Grain', 'Pulse', 'Oilseed', 'Fruit', 'Other'].map(category => <option key={category}>{category}</option>)}
+                    </select>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -515,17 +491,26 @@ export const AuthModal: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-[#6B7280] mb-1">
-                    GST / Trade License
-                  </label>
+                  <label className="block text-[10px] font-bold text-[#6B7280] mb-1">Buyer / Business Type</label>
                   <input
                     type="text"
-                    value={regGstNumber}
-                    onChange={(e) => setRegGstNumber(e.target.value)}
-                    placeholder="27AAAAA0000A1Z5"
+                    value={regBuyerType}
+                    onChange={(e) => setRegBuyerType(e.target.value)}
+                    placeholder="e.g. Processor"
                     className="w-full bg-white border border-[#D1D5DB] rounded-lg px-2.5 py-1.5 text-xs text-[#1F2937] font-mono uppercase font-bold"
                   />
                 </div>
+              </div>
+            )}
+
+            {regRole === 'logistics' && (
+              <div className="grid grid-cols-2 gap-3 bg-[#F9FAFB] p-3 rounded-xl border border-[#E5E7EB]">
+                <input type="text" value={regCompanyName} onChange={(e) => setRegCompanyName(e.target.value)} placeholder="Transport firm name" className="col-span-2 w-full bg-white border border-[#D1D5DB] rounded-lg px-2.5 py-1.5 text-xs" required />
+                <label className="text-[11px] text-[#4B5563]"><input type="checkbox" checked={regWarehouseAvailable} onChange={(e) => setRegWarehouseAvailable(e.target.checked)} /> Warehouse available</label>
+                <label className="text-[11px] text-[#4B5563]"><input type="checkbox" checked={regColdStorageAvailable} onChange={(e) => setRegColdStorageAvailable(e.target.checked)} /> Cold storage available</label>
+                <input type="text" value={regVehicleTypes} onChange={(e) => setRegVehicleTypes(e.target.value)} placeholder="Vehicle types (comma separated)" className="w-full bg-white border border-[#D1D5DB] rounded-lg px-2.5 py-1.5 text-xs" />
+                <input type="text" value={regVehicleCapacity} onChange={(e) => setRegVehicleCapacity(e.target.value)} placeholder="Vehicle capacity" className="w-full bg-white border border-[#D1D5DB] rounded-lg px-2.5 py-1.5 text-xs" />
+                <input type="text" value={regServiceAreas} onChange={(e) => setRegServiceAreas(e.target.value)} placeholder="Service areas (comma separated)" className="col-span-2 w-full bg-white border border-[#D1D5DB] rounded-lg px-2.5 py-1.5 text-xs" />
               </div>
             )}
 

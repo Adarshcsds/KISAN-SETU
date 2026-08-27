@@ -24,6 +24,7 @@ import {
   Send,
   X
 } from 'lucide-react';
+import { BuyerDemandWorkflow } from './BuyerDemandWorkflow';
 
 export const BuyerDashboard: React.FC = () => {
   const { 
@@ -73,6 +74,7 @@ export const BuyerDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <BuyerDemandWorkflow />
       
       {/* Buyer Header Banner */}
       <div className="clean-card p-5 sm:p-7 flex flex-col md:flex-row md:items-center justify-between gap-4">

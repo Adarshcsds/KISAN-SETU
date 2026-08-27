@@ -22,6 +22,7 @@ import {
 import { DEFAULT_USERS } from '../data/mockUsers';
 import { TRANSLATIONS } from '../utils/translations';
 import confetti from 'canvas-confetti';
+import { AuthUserResponse, KisanSetuApi } from '../services/api';
 
 export interface AppNotification {
   id: string;
@@ -37,8 +38,8 @@ export interface AppNotification {
 interface AppContextType {
   currentUser: User;
   usersList: User[];
-  loginUser: (user: User) => void;
-  registerUser: (userData: Partial<User>) => User;
+  loginUser: (identifier: string, password: string) => Promise<User>;
+  registerUser: (userData: Partial<User> & { password: string; profile: Record<string, unknown> }) => Promise<User>;
   logoutUser: () => void;
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (open: boolean) => void;
@@ -124,7 +125,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register' | 'forgot_password'>('login');
 
-  const [role, setRole] = useState<Role>(currentUser.role || 'farmer');
+  const [role, setDisplayedRole] = useState<Role>(currentUser.role || 'farmer');
   const [language, setLanguage] = useState<Language>('en');
   const [selectedCropId, setSelectedCropId] = useState<string>('wheat');
   const [selectedMandiId, setSelectedMandiId] = useState<string | null>('mandi-pune');
@@ -143,53 +144,59 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   useEffect(() => {
     localStorage.setItem('kisansetu_current_user', JSON.stringify(currentUser));
-    setRole(currentUser.role);
+    setDisplayedRole(currentUser.role);
   }, [currentUser]);
 
-  const loginUser = (user: User) => {
-    setCurrentUser(user);
-    setRole(user.role);
-    setIsAuthModalOpen(false);
-    confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
+  const toUser = (user: AuthUserResponse): User => {
+    const profile = user.profile || {};
+    return {
+      id: user.id, name: user.name, phone: user.phone, email: user.email, role: user.role,
+      location: String(profile.location || profile.address || ''), district: String(profile.district || ''),
+      state: String(profile.state || ''), pinCode: String(profile.pinCode || ''),
+      farmSizeAcres: Number(profile.farmSizeAcres || 0) || undefined,
+      primaryCrops: Array.isArray(profile.crops) ? profile.crops.map((crop: any) => typeof crop === 'string' ? crop : crop.name).filter(Boolean) : [],
+      companyName: String(profile.firmName || ''), buyerType: String(profile.businessType || ''),
+      businessAddress: String(profile.address || ''), vehicleTypes: Array.isArray(profile.vehicleTypes) ? profile.vehicleTypes as string[] : [],
+      vehicleCapacity: String(profile.vehicleCapacity || ''), serviceAreas: Array.isArray(profile.serviceAreas) ? profile.serviceAreas as string[] : [],
+      verified: true, avatarUrl: user.role === 'farmer' ? '👨‍🌾' : user.role === 'buyer' ? '🏢' : '🚚', walletBalance: 0,
+    };
   };
 
-  const registerUser = (userData: Partial<User>): User => {
-    const newUserId = `usr-${Date.now()}`;
-    const newUser: User = {
-      id: newUserId,
-      name: userData.name || 'New Member',
-      phone: userData.phone || '9999999999',
-      email: userData.email || '',
-      role: userData.role || 'farmer',
-      location: userData.location || 'Local Village',
-      district: userData.district || 'Nashik',
-      state: userData.state || 'Maharashtra',
-      pinCode: userData.pinCode || '422001',
-      farmSizeAcres: userData.farmSizeAcres || 5.0,
-      primaryCrops: userData.primaryCrops || ['wheat', 'soyabean'],
-      companyName: userData.companyName || '',
-      buyerType: userData.buyerType || '',
-      gstNumber: userData.gstNumber || '',
-      fpoMemberCount: userData.fpoMemberCount || 50,
-      verified: true,
-      avatarUrl: userData.role === 'farmer' ? '👨‍🌾' : userData.role === 'buyer' ? '🏢' : userData.role === 'fpo' ? '👥' : '⚖️',
-      walletBalance: 0,
-    };
-
-    setUsersList(prev => [newUser, ...prev]);
-    setCurrentUser(newUser);
-    setRole(newUser.role);
+  const completeAuthentication = (response: { user: AuthUserResponse; accessToken: string }): User => {
+    const user = toUser(response.user);
+    localStorage.setItem('kisansetu_access_token', response.accessToken);
+    setCurrentUser(user);
     setIsAuthModalOpen(false);
+    confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
+    return user;
+  };
 
-    confetti({ particleCount: 100, spread: 90, origin: { y: 0.5 } });
-    return newUser;
+  const loginUser = async (identifier: string, password: string): Promise<User> => completeAuthentication(await KisanSetuApi.login(identifier, password));
+
+  const registerUser = async (userData: Partial<User> & { password: string; profile: Record<string, unknown> }): Promise<User> => {
+    if (!userData.role || !['farmer', 'buyer', 'logistics'].includes(userData.role)) throw new Error('Select a valid platform role');
+    return completeAuthentication(await KisanSetuApi.register({ name: userData.name || '', phone: userData.phone || '', email: userData.email, password: userData.password, role: userData.role as AuthUserResponse['role'], profile: userData.profile }));
+  };
+
+  // UI role changes cannot alter an authenticated account's backend role.
+  const setRole = (nextRole: Role) => {
+    if (nextRole === currentUser.role) setDisplayedRole(nextRole);
   };
 
   const logoutUser = () => {
-    // Reset to public guest or Rajesh
+    localStorage.removeItem('kisansetu_access_token');
+    localStorage.removeItem('kisansetu_current_user');
     setCurrentUser(DEFAULT_USERS[0]);
-    setRole('farmer');
+    setDisplayedRole('farmer');
   };
+
+  useEffect(() => {
+    const token = localStorage.getItem('kisansetu_access_token');
+    if (!token) return;
+    KisanSetuApi.me(token)
+      .then(user => setCurrentUser(toUser(user)))
+      .catch(() => localStorage.removeItem('kisansetu_access_token'));
+  }, []);
 
   const [notifications, setNotifications] = useState<AppNotification[]>([
     {

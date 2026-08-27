@@ -1,4 +1,4 @@
-export type Role = 'farmer' | 'buyer' | 'fpo' | 'admin';
+export type Role = 'farmer' | 'buyer' | 'logistics' | 'fpo' | 'admin';
 
 export type Language = 'en' | 'hi' | 'mr' | 'pa' | 'te';
 
@@ -20,6 +20,10 @@ export interface User {
   buyerType?: string;
   gstNumber?: string;
   fpoMemberCount?: number;
+  businessAddress?: string;
+  vehicleTypes?: string[];
+  vehicleCapacity?: string;
+  serviceAreas?: string[];
   verified: boolean;
   avatarUrl?: string;
   walletBalance?: number;

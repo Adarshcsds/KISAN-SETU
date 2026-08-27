@@ -5,6 +5,35 @@
 
 const API_BASE_URL = 'http://127.0.0.1:8000/api';
 
+export interface AuthUserResponse {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  role: 'farmer' | 'buyer' | 'logistics';
+  profile: Record<string, unknown>;
+}
+
+async function authRequest(path: string, options: RequestInit = {}) {
+  const response = await fetch(`${API_BASE_URL}/auth${path}`, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.detail || 'Authentication request failed');
+  return body;
+}
+
+async function protectedRequest(path: string, token: string, options: RequestInit = {}) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(options.headers || {}) },
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.detail || 'Request failed');
+  return body;
+}
+
 export interface BackendHealthResponse {
   status: string;
   service: string;
@@ -13,6 +42,16 @@ export interface BackendHealthResponse {
 }
 
 export const KisanSetuApi = {
+  register: (payload: { name: string; phone: string; email?: string; password: string; role: AuthUserResponse['role']; profile: Record<string, unknown> }) => authRequest('/register', { method: 'POST', body: JSON.stringify(payload) }),
+  login: (identifier: string, password: string) => authRequest('/login', { method: 'POST', body: JSON.stringify({ identifier, password }) }),
+  me: (token: string): Promise<AuthUserResponse> => authRequest('/me', { headers: { Authorization: `Bearer ${token}` } }),
+  getDemands: (token: string) => protectedRequest('/demands', token),
+  createDemand: (token: string, payload: unknown) => protectedRequest('/demands', token, { method: 'POST', body: JSON.stringify(payload) }),
+  getDemandOffers: (token: string, demandId: string) => protectedRequest(`/demands/${demandId}/offers`, token),
+  createDemandOffer: (token: string, demandId: string, payload: unknown) => protectedRequest(`/demands/${demandId}/offers`, token, { method: 'POST', body: JSON.stringify(payload) }),
+  getMyOffers: (token: string) => protectedRequest('/offers', token),
+  respondToOffer: (token: string, offerId: string, action: 'accept' | 'reject' | 'counter', payload?: unknown) => protectedRequest(`/offers/${offerId}/${action}`, token, { method: 'POST', body: payload ? JSON.stringify(payload) : undefined }),
+  getDeals: (token: string) => protectedRequest('/demands/deals', token),
   // 1. Health check
   checkHealth: async (): Promise<BackendHealthResponse | null> => {
     try {

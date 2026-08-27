@@ -1,11 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Role, Language } from '../../types';
+import { Language } from '../../types';
 import { 
   Sprout, 
-  Building2, 
-  Users, 
-  ShieldCheck, 
   Bell, 
   Globe, 
   Wallet, 
@@ -22,7 +19,6 @@ export const Navbar: React.FC = () => {
     setIsAuthModalOpen,
     setAuthModalMode,
     role, 
-    setRole, 
     language, 
     setLanguage, 
     t, 
@@ -39,13 +35,6 @@ export const Navbar: React.FC = () => {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-
-  const roles: { id: Role; label: string; icon: React.ReactNode; desc: string }[] = [
-    { id: 'farmer', label: 'Farmer', icon: <Sprout className="w-4 h-4 text-emerald-400" />, desc: 'Market predictor, sell crop, dispatch vehicle' },
-    { id: 'buyer', label: 'Buyer', icon: <Building2 className="w-4 h-4 text-amber-400" />, desc: 'Review orders, accept bids, track inbound trucks' },
-    { id: 'fpo', label: 'FPO Aggregator', icon: <Users className="w-4 h-4 text-blue-400" />, desc: 'Bulk pooling & member dividends' },
-    { id: 'admin', label: 'Market Assayer', icon: <ShieldCheck className="w-4 h-4 text-purple-400" />, desc: 'Quality audit & compliance' },
-  ];
 
   const languages: { id: Language; label: string; nativeName: string }[] = [
     { id: 'en', label: 'English', nativeName: 'English' },
@@ -98,43 +87,12 @@ export const Navbar: React.FC = () => {
             </div>
           </div>
 
-          {/* Center Navigation Role Switcher */}
-          <div className="hidden lg:flex items-center bg-[#143B1D] p-1 rounded-xl border border-[#276634]">
-            {roles.map((r) => {
-              const active = role === r.id;
-              return (
-                <button
-                  key={r.id}
-                  onClick={() => setRole(r.id)}
-                  className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    active
-                      ? 'bg-[#2E7D32] text-white shadow-sm'
-                      : 'text-[#D1E7D5] hover:text-white hover:bg-[#1A4B24]'
-                  }`}
-                  title={r.desc}
-                >
-                  {r.icon}
-                  <span>{r.label}</span>
-                </button>
-              );
-            })}
-          </div>
+          <div className="hidden lg:block text-xs font-bold capitalize text-[#D1E7D5]">{role} account</div>
 
           {/* Right Action Icons & Badges */}
           <div className="flex items-center space-x-2 sm:space-x-3">
             
-            {/* Mobile Role Selector */}
-            <div className="lg:hidden">
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as Role)}
-                className="bg-[#143B1D] text-xs text-white border border-[#276634] rounded-lg px-2 py-1.5 font-bold"
-              >
-                {roles.map(r => (
-                  <option key={r.id} value={r.id}>{r.label}</option>
-                ))}
-              </select>
-            </div>
+            <span className="lg:hidden text-[10px] font-bold capitalize text-[#D1E7D5]">{role}</span>
 
             {/* Financial Status Capsule */}
             {role === 'farmer' ? (

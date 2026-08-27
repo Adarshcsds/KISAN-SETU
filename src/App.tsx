@@ -4,6 +4,7 @@ import { Navbar } from './components/common/Navbar';
 import { FarmerDashboard } from './components/farmer/FarmerDashboard';
 import { MarketBuyersView } from './components/farmer/MarketBuyersView';
 import { FarmerOrdersList } from './components/farmer/FarmerOrdersList';
+import { DemandMarketplace } from './components/farmer/DemandMarketplace';
 import { BuyerDashboard } from './components/buyer/BuyerDashboard';
 import { FpoDashboard } from './components/fpo/FpoDashboard';
 import { AiQualityAssessorModal } from './components/quality/AiQualityAssessorModal';
@@ -81,6 +82,16 @@ export const App: React.FC = () => {
                   </button>
 
                   <button
+                    onClick={() => { setViewingMandiBuyers(null); setActiveTab('demands'); }}
+                    className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                      activeTab === 'demands' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950' : 'text-slate-400 hover:text-slate-200 hover:bg-dark-750'
+                    }`}
+                  >
+                    <Store className="w-4 h-4" />
+                    <span>Buyer Demands</span>
+                  </button>
+
+                  <button
                     onClick={() => setIsStorageModalOpen(true)}
                     className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-dark-750 transition"
                   >
@@ -108,6 +119,13 @@ export const App: React.FC = () => {
                     <span>{t('buyer_role')}</span>
                   </button>
                 </>
+              )}
+
+              {role === 'logistics' && (
+                <button onClick={() => setActiveTab('dashboard')} className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-600 text-white shadow-md">
+                  <Truck className="w-4 h-4" />
+                  <span>Logistics</span>
+                </button>
               )}
 
               {role === 'fpo' && (
@@ -167,12 +185,21 @@ export const App: React.FC = () => {
                 {activeTab === 'orders' && (
                   <FarmerOrdersList />
                 )}
+                {activeTab === 'demands' && <DemandMarketplace />}
               </>
             )}
 
             {/* Buyer View */}
             {role === 'buyer' && (
               <BuyerDashboard />
+            )}
+
+            {role === 'logistics' && (
+              <div className="glass-card rounded-3xl p-8 border border-amber-800/60 space-y-3">
+                <Truck className="w-10 h-10 text-amber-400" />
+                <h2 className="text-xl font-bold text-white">Logistics Dashboard</h2>
+                <p className="text-sm text-slate-300">Transport requests and fare proposals will appear here after a farmer and buyer complete a deal.</p>
+              </div>
             )}
 
             {/* FPO View */}

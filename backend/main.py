@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.routers import commodities, mandis, predictions, orders
+from backend.database import initialize_auth_schema
+from backend.routers import auth, commodities, mandis, predictions, orders, demands
 
 app = FastAPI(
     title="KisanSetu (किसानसेतु) Agri-Market API",
@@ -29,6 +30,13 @@ app.include_router(commodities.router, prefix="/api")
 app.include_router(mandis.router, prefix="/api")
 app.include_router(predictions.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
+app.include_router(auth.router, prefix="/api")
+app.include_router(demands.router, prefix="/api")
+app.include_router(demands.offer_router, prefix="/api")
+
+@app.on_event("startup")
+def initialize_database_schema():
+    initialize_auth_schema()
 
 @app.get("/")
 def root():

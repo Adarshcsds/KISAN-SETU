@@ -1,0 +1,152 @@
+import os
+
+import psycopg2
+
+
+DB_CONFIG = {
+    "host": "localhost",
+    "port": 5432,
+    "database": "kisanmitra",
+    "user": "postgres",
+    "password": os.getenv("DB_PASSWORD", "KisanMitra123"),
+}
+
+
+def get_connection():
+    return psycopg2.connect(**DB_CONFIG)
+
+
+def initialize_auth_schema():
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id UUID PRIMARY KEY,
+                    name VARCHAR(120) NOT NULL,
+                    phone VARCHAR(20) NOT NULL UNIQUE,
+                    email VARCHAR(254) UNIQUE,
+                    password_hash TEXT NOT NULL,
+                    role VARCHAR(20) NOT NULL CHECK (role IN ('farmer', 'buyer', 'logistics')),
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                    profile JSONB NOT NULL DEFAULT '{}'::jsonb
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS farmer_profiles (
+                    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                    location TEXT NOT NULL, district VARCHAR(120) NOT NULL,
+                    state VARCHAR(120) NOT NULL, pin_code VARCHAR(12) NOT NULL,
+                    farm_size_acres NUMERIC(12, 2), primary_crop VARCHAR(120),
+                    crops JSONB NOT NULL DEFAULT '[]'::jsonb
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS farmer_crops (
+                    id BIGSERIAL PRIMARY KEY, farmer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    crop_name VARCHAR(120) NOT NULL, crop_category VARCHAR(30) NOT NULL,
+                    is_primary BOOLEAN NOT NULL DEFAULT FALSE
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS buyer_profiles (
+                    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                    firm_name VARCHAR(200) NOT NULL, business_type VARCHAR(120) NOT NULL,
+                    address TEXT NOT NULL, district VARCHAR(120) NOT NULL,
+                    state VARCHAR(120) NOT NULL, pin_code VARCHAR(12) NOT NULL
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS logistics_profiles (
+                    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                    firm_name VARCHAR(200) NOT NULL, address TEXT NOT NULL,
+                    district VARCHAR(120) NOT NULL, state VARCHAR(120) NOT NULL, pin_code VARCHAR(12) NOT NULL,
+                    warehouse_available BOOLEAN NOT NULL DEFAULT FALSE, warehouse_address TEXT,
+                    cold_storage_available BOOLEAN NOT NULL DEFAULT FALSE, cold_storage_address TEXT,
+                    vehicle_types JSONB NOT NULL DEFAULT '[]'::jsonb, vehicle_capacity VARCHAR(120),
+                    service_areas JSONB NOT NULL DEFAULT '[]'::jsonb
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS buyer_demands (
+                    id UUID PRIMARY KEY, buyer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    crop_name VARCHAR(120) NOT NULL, crop_category VARCHAR(50) NOT NULL,
+                    quantity_quintals NUMERIC(12,2) NOT NULL CHECK (quantity_quintals > 0),
+                    offered_price_per_quintal NUMERIC(12,2) NOT NULL CHECK (offered_price_per_quintal > 0),
+                    quality_grade VARCHAR(120) NOT NULL, delivery_location TEXT NOT NULL,
+                    deadline TIMESTAMPTZ NOT NULL, notes TEXT,
+                    status VARCHAR(30) NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN','PARTIALLY_MATCHED','MATCHED','CLOSED','CANCELLED')),
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS demand_offers (
+                    id UUID PRIMARY KEY, demand_id UUID NOT NULL REFERENCES buyer_demands(id) ON DELETE CASCADE,
+                    farmer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    offered_quantity_quintals NUMERIC(12,2) NOT NULL CHECK (offered_quantity_quintals > 0),
+                    offered_price_per_quintal NUMERIC(12,2) NOT NULL CHECK (offered_price_per_quintal > 0),
+                    quality_grade VARCHAR(120) NOT NULL, message TEXT,
+                    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','COUNTERED','ACCEPTED','REJECTED','WITHDRAWN')),
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS trade_deals (
+                    id UUID PRIMARY KEY, deal_code VARCHAR(32) NOT NULL UNIQUE,
+                    offer_id UUID UNIQUE REFERENCES demand_offers(id), demand_id UUID REFERENCES buyer_demands(id),
+                    farmer_id UUID NOT NULL REFERENCES users(id), buyer_id UUID NOT NULL REFERENCES users(id),
+                    crop_name VARCHAR(120) NOT NULL, agreed_quantity_quintals NUMERIC(12,2) NOT NULL,
+                    agreed_price_per_quintal NUMERIC(12,2) NOT NULL, gross_amount NUMERIC(14,2) NOT NULL,
+                    pickup_location TEXT NOT NULL, delivery_location TEXT NOT NULL, quality_grade VARCHAR(120) NOT NULL,
+                    deal_password TEXT NOT NULL, status VARCHAR(30) NOT NULL DEFAULT 'AGREED', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_buyer_demands_active ON buyer_demands(status, deadline)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_buyer_demands_buyer ON buyer_demands(buyer_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_demand_offers_demand ON demand_offers(demand_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_demand_offers_farmer ON demand_offers(farmer_id)")
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS farmer_direct_requests (
+                    id UUID PRIMARY KEY, farmer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    buyer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    crop_name VARCHAR(120) NOT NULL, crop_category VARCHAR(50) NOT NULL,
+                    quantity_quintals NUMERIC(12,2) NOT NULL CHECK (quantity_quintals > 0),
+                    offered_price_per_quintal NUMERIC(12,2) NOT NULL CHECK (offered_price_per_quintal > 0),
+                    quality_grade VARCHAR(120) NOT NULL, pickup_location TEXT NOT NULL, message TEXT,
+                    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','COUNTERED','ACCEPTED','REJECTED','WITHDRAWN')),
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_farmer_direct_requests_buyer ON farmer_direct_requests(buyer_id, status)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_farmer_direct_requests_farmer ON farmer_direct_requests(farmer_id, status)")
+            cur.execute("ALTER TABLE trade_deals ALTER COLUMN offer_id DROP NOT NULL")
+            cur.execute("ALTER TABLE trade_deals ADD COLUMN IF NOT EXISTS direct_request_id UUID UNIQUE REFERENCES farmer_direct_requests(id)")
+            cur.execute("""
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM pg_attribute
+                        WHERE attrelid = 'trade_deals'::regclass
+                          AND attname = 'demand_id'
+                          AND attnotnull
+                    ) THEN
+                        ALTER TABLE trade_deals ALTER COLUMN demand_id DROP NOT NULL;
+                    END IF;
+                END $$
+            """)
+            cur.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint
+                        WHERE conrelid = 'trade_deals'::regclass AND conname = 'trade_deals_source_check'
+                    ) THEN
+                        ALTER TABLE trade_deals ADD CONSTRAINT trade_deals_source_check
+                            CHECK (demand_id IS NOT NULL OR direct_request_id IS NOT NULL);
+                    END IF;
+                END $$
+            """)
+        conn.commit()
+    finally:
+        conn.close()
