@@ -14,7 +14,9 @@ import {
   Building2,
   ChevronRight,
   ShieldCheck,
-  Zap
+  Zap,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 interface MarketCalculationResult {
@@ -43,9 +45,10 @@ export const SmartMarketPredictor: React.FC = () => {
   } = useApp();
 
   const [quantity, setQuantity] = useState<number>(75);
-  const [expectedLossPercent, setExpectedLossPercent] = useState<number>(2.0);
+  const [expectedLossPercent, setExpectedLossPercent] = useState<number>(1.5);
   const [qualityGrade, setQualityGrade] = useState<QualityGrade>('Grade A (Export)');
   const [maxDistance, setMaxDistance] = useState<number>(200);
+  const [showCostDetails, setShowCostDetails] = useState<boolean>(false);
 
   // Grade multiplier
   const gradeMultiplier = useMemo(() => {
@@ -116,7 +119,7 @@ export const SmartMarketPredictor: React.FC = () => {
   };
 
   return (
-    <div className="clean-card p-5 sm:p-6 space-y-6">
+    <div className="space-y-6">
       
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E5E7EB] pb-4">
@@ -127,10 +130,10 @@ export const SmartMarketPredictor: React.FC = () => {
           <div>
             <div className="flex items-center space-x-2">
               <h2 className="text-base sm:text-lg font-bold text-[#1F2937] tracking-tight">
-                AI Net Price Realization Predictor
+                {t('ai_predictor_title')}
               </h2>
               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#DCFCE7] text-[#15803D] border border-[#86EFAC]">
-                PROFIT CALCULATOR
+                {t('highest_profit')}
               </span>
             </div>
             <p className="text-xs text-[#4B5563] mt-0.5">
@@ -141,70 +144,48 @@ export const SmartMarketPredictor: React.FC = () => {
       </div>
 
       {/* Input Parameters Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 bg-[#F9FAFB] p-4 rounded-xl border border-[#E5E7EB]">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 bg-[#F9FAFB] p-4 rounded-2xl border border-[#E5E7EB]">
         
-        {/* Crop Selection */}
-        <div>
-          <label className="block text-xs font-bold text-[#1F2937] mb-1.5 flex items-center justify-between">
-            <span>Commodity Crop</span>
-            <span className="text-[#2E7D32] text-[10px] font-semibold">{selectedCrop.category}</span>
-          </label>
-          <select
-            value={selectedCropId}
-            onChange={(e) => setSelectedCropId(e.target.value)}
-            className="w-full bg-white border border-[#D1D5DB] rounded-xl px-3 py-2 text-xs font-bold text-[#1F2937] focus:outline-none focus:border-[#2E7D32] transition cursor-pointer"
-          >
-            {commodities.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.icon} {c.name} (Avg ₹{c.currentAvgPrice}/q)
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Quantity (Quintals) */}
-        <div>
-          <label className="block text-xs font-bold text-[#1F2937] mb-1.5 flex items-center justify-between">
-            <span>Harvest Volume</span>
-            <span className="text-[#6B7280] font-mono text-[10px]">~{(quantity * 0.1).toFixed(1)} Metric Tonnes</span>
+        {/* Quantity (Quintals) with quick chips */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-bold text-[#1F2937] flex items-center justify-between">
+            <span>{t('quantity') || 'Crop Quantity (क्विंटल)'}</span>
+            <span className="text-[#6B7280] font-mono text-[11px]">~{(quantity * 0.1).toFixed(1)} MT</span>
           </label>
           <div className="relative">
             <input
               type="number"
               min={5}
-              max={1000}
+              max={2000}
               value={quantity}
               onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
-              className="w-full bg-white border border-[#D1D5DB] rounded-xl px-3 py-2 text-xs font-extrabold text-[#1F2937] focus:outline-none focus:border-[#2E7D32] transition pr-12 font-mono"
+              className="w-full bg-white border border-[#D1D5DB] rounded-xl px-3 py-2 text-sm font-extrabold text-[#1F2937] focus:outline-none focus:border-[#2E7D32] transition pr-12 font-mono"
             />
-            <span className="absolute right-3 top-2 text-xs text-[#6B7280] font-bold">Qtl</span>
+            <span className="absolute right-3 top-2.5 text-xs text-[#6B7280] font-bold">Qtl</span>
           </div>
-        </div>
-
-        {/* Expected Transit Loss % */}
-        <div>
-          <label className="block text-xs font-bold text-[#1F2937] mb-1.5 flex items-center justify-between">
-            <span>Transit Loss Buffer</span>
-            <span className="text-[#D97706] font-mono text-[10px] font-bold">{expectedLossPercent}%</span>
-          </label>
-          <div className="relative">
-            <input
-              type="number"
-              step="0.5"
-              min={0}
-              max={15}
-              value={expectedLossPercent}
-              onChange={(e) => setExpectedLossPercent(Math.max(0, Number(e.target.value)))}
-              className="w-full bg-white border border-[#D1D5DB] rounded-xl px-3 py-2 text-xs font-extrabold text-[#1F2937] focus:outline-none focus:border-[#2E7D32] transition pr-8 font-mono"
-            />
-            <span className="absolute right-3 top-2 text-xs text-[#6B7280] font-bold">%</span>
+          {/* Quick steppers for mobile */}
+          <div className="flex space-x-1.5 pt-0.5">
+            {[25, 50, 75, 100, 200].map(amt => (
+              <button
+                key={amt}
+                type="button"
+                onClick={() => setQuantity(amt)}
+                className={`text-[10px] px-2 py-1 rounded-lg border font-bold transition cursor-pointer ${
+                  quantity === amt 
+                    ? 'bg-[#2E7D32] text-white border-[#2E7D32]' 
+                    : 'bg-white text-[#4B5563] border-[#E5E7EB] hover:bg-[#F3F4F6]'
+                }`}
+              >
+                {amt}q
+              </button>
+            ))}
           </div>
         </div>
 
         {/* Quality Grade */}
-        <div>
-          <label className="block text-xs font-bold text-[#1F2937] mb-1.5">
-            Crop Quality Grade
+        <div className="space-y-1.5">
+          <label className="block text-xs font-bold text-[#1F2937]">
+            {t('quality_grade') || 'Quality Grade (गुणवत्ता)'}
           </label>
           <select
             value={qualityGrade}
@@ -212,84 +193,131 @@ export const SmartMarketPredictor: React.FC = () => {
             className="w-full bg-white border border-[#D1D5DB] rounded-xl px-3 py-2 text-xs font-bold text-[#1F2937] focus:outline-none focus:border-[#2E7D32] transition cursor-pointer"
           >
             <option value="Grade A (Export)">Grade A (Export Premium +3%)</option>
-            <option value="Grade B (Premium)">Grade B (Domestic Standard)</option>
+            <option value="Grade B (Premium)">Grade B (Standard Market)</option>
             <option value="Grade C (Standard)">Grade C (Fair Average -5%)</option>
           </select>
+          <span className="text-[10px] text-[#6B7280] block">
+            Higher quality fetches direct institutional premium rate
+          </span>
+        </div>
+
+        {/* Max Travel Distance Radius */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-bold text-[#1F2937] flex items-center justify-between">
+            <span>{t('distance_radius') || 'Max Travel Distance'}</span>
+            <span className="text-[#15803D] font-mono font-bold text-xs">{maxDistance} km</span>
+          </label>
+          <input
+            type="range"
+            min={20}
+            max={400}
+            step={10}
+            value={maxDistance}
+            onChange={(e) => setMaxDistance(Number(e.target.value))}
+            className="w-full accent-[#2E7D32] cursor-pointer"
+          />
+          <div className="flex justify-between text-[10px] text-[#6B7280]">
+            <span>20 km (Local)</span>
+            <span>200 km</span>
+            <span>400 km (State)</span>
+          </div>
         </div>
 
       </div>
 
       {/* Recommended Best Market Highlight Card */}
       {bestResult && (
-        <div className="clean-card p-5 sm:p-6 border-2 border-[#2E7D32] bg-[#F0FDF4] relative overflow-hidden">
+        <div className="clean-card p-5 sm:p-6 border-2 border-[#2E7D32] bg-[#F0FDF4] relative overflow-hidden space-y-4">
           
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
             
             {/* Left Market Info */}
             <div className="space-y-2">
               <div className="flex items-center space-x-2">
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#2E7D32] text-white">
-                  ★ HIGHEST PROFIT MARKET
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-[#2E7D32] text-white">
+                  ★ {t('recommended_market')}
                 </span>
-                <span className="text-xs text-[#4B5563] font-medium">• {bestResult.mandi.distanceKm} km away</span>
+                <span className="text-xs text-[#4B5563] font-medium">• 🚜 {bestResult.mandi.distanceKm} km away</span>
               </div>
 
-              <h3 className="text-lg sm:text-xl font-bold text-[#1F2937]">
+              <h3 className="text-lg sm:text-2xl font-extrabold text-[#1F2937]">
                 {bestResult.mandi.name} ({bestResult.mandi.district})
               </h3>
 
               <div className="flex items-center space-x-3 text-xs text-[#4B5563]">
                 <span className="text-[#15803D] font-bold">
-                  🏢 {bestResult.mandi.verifiedBuyersCount} Institutional Buyers Ready
+                  🏢 {bestResult.mandi.verifiedBuyersCount} Verified Buyers Ready
                 </span>
                 <span>•</span>
                 <span>⭐ {bestResult.mandi.rating} Rating</span>
               </div>
             </div>
 
-            {/* Financial Breakdown Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-white p-3 rounded-xl border border-[#BBF7D0] text-xs">
-              
-              <div className="p-2">
-                <div className="text-[10px] text-[#6B7280]">Offered Rate</div>
-                <div className="text-sm font-bold text-[#1F2937] mt-0.5 font-mono">₹{bestResult.grossPricePerQuintal}/q</div>
-                <div className="text-[10px] text-[#6B7280]">₹{bestResult.grossRealization.toLocaleString('en-IN')} gross</div>
-              </div>
-
-              <div className="p-2">
-                <div className="text-[10px] text-[#6B7280]">Freight Cost</div>
-                <div className="text-sm font-bold text-[#DC2626] mt-0.5 font-mono">-₹{bestResult.freightCost.toLocaleString('en-IN')}</div>
-                <div className="text-[10px] text-[#6B7280]">Fixed ₹26/km</div>
-              </div>
-
-              <div className="p-2">
-                <div className="text-[10px] text-[#6B7280]">Handling & Cess</div>
-                <div className="text-sm font-bold text-[#D97706] mt-0.5 font-mono">-₹{bestResult.handlingCost.toLocaleString('en-IN')}</div>
-                <div className="text-[10px] text-[#6B7280]">{bestResult.mandi.mandiCessPercent}% Cess</div>
-              </div>
-
-              <div className="p-2 bg-[#DCFCE7] rounded-lg border border-[#86EFAC]">
-                <div className="text-[10px] text-[#15803D] font-bold">NET IN-HAND PAYOUT</div>
-                <div className="text-base font-extrabold text-[#15803D] font-mono mt-0.5">
+            {/* In-Hand Payout Summary Box */}
+            <div className="bg-white p-4 rounded-2xl border-2 border-[#86EFAC] shadow-xs flex flex-col sm:flex-row sm:items-center gap-4 text-center sm:text-left">
+              <div>
+                <div className="text-[11px] text-[#15803D] font-extrabold uppercase tracking-wide">
+                  {t('in_hand_money')}
+                </div>
+                <div className="text-2xl sm:text-3xl font-extrabold text-[#15803D] font-mono mt-0.5">
                   ₹{bestResult.netRealization.toLocaleString('en-IN')}
                 </div>
-                <div className="text-[10px] text-[#166534] font-semibold">₹{bestResult.netRatePerQuintal}/q in-hand</div>
+                <div className="text-xs text-[#166534] font-semibold">
+                  ₹{bestResult.netRatePerQuintal}/quintal in your pocket
+                </div>
               </div>
 
-            </div>
-
-            {/* Action CTA to View Buyers */}
-            <div>
               <button
                 onClick={() => handleSelectMarket(bestResult.mandi)}
-                className="w-full lg:w-auto px-6 py-3 rounded-xl bg-[#2E7D32] hover:bg-[#1E5128] text-white font-bold text-xs shadow-md flex items-center justify-center space-x-2 transition cursor-pointer"
+                className="w-full sm:w-auto px-5 py-3 rounded-xl bg-[#2E7D32] hover:bg-[#1E5128] text-white font-extrabold text-xs shadow-md flex items-center justify-center space-x-2 transition cursor-pointer touch-target"
               >
                 <Building2 className="w-4 h-4" />
-                <span>View Buyers at this Market</span>
+                <span>{t('view_buyers')}</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
 
+          </div>
+
+          {/* Toggle Button for Cost Details */}
+          <div className="pt-2 border-t border-[#BBF7D0]">
+            <button
+              onClick={() => setShowCostDetails(!showCostDetails)}
+              className="text-xs font-bold text-[#15803D] hover:underline flex items-center space-x-1 cursor-pointer"
+            >
+              <span>{showCostDetails ? t('hide_cost_breakdown') : t('view_cost_breakdown')}</span>
+              {showCostDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+
+            {showCostDetails && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-white p-3 rounded-xl border border-[#BBF7D0] text-xs mt-3">
+                <div className="p-2">
+                  <div className="text-[10px] text-[#6B7280]">Gross Market Rate</div>
+                  <div className="text-sm font-bold text-[#1F2937] mt-0.5 font-mono">₹{bestResult.grossPricePerQuintal}/q</div>
+                  <div className="text-[10px] text-[#6B7280]">₹{bestResult.grossRealization.toLocaleString('en-IN')} total</div>
+                </div>
+
+                <div className="p-2">
+                  <div className="text-[10px] text-[#6B7280]">Freight Cost ({bestResult.mandi.distanceKm} km)</div>
+                  <div className="text-sm font-bold text-[#DC2626] mt-0.5 font-mono">-₹{bestResult.freightCost.toLocaleString('en-IN')}</div>
+                  <div className="text-[10px] text-[#6B7280]">₹26/km fixed freight</div>
+                </div>
+
+                <div className="p-2">
+                  <div className="text-[10px] text-[#6B7280]">Handling & Mandi Cess</div>
+                  <div className="text-sm font-bold text-[#D97706] mt-0.5 font-mono">-₹{bestResult.handlingCost.toLocaleString('en-IN')}</div>
+                  <div className="text-[10px] text-[#6B7280]">{bestResult.mandi.mandiCessPercent}% APMC cess</div>
+                </div>
+
+                <div className="p-2 bg-[#DCFCE7] rounded-lg border border-[#86EFAC]">
+                  <div className="text-[10px] text-[#15803D] font-bold">NET IN-HAND TOTAL</div>
+                  <div className="text-base font-extrabold text-[#15803D] font-mono mt-0.5">
+                    ₹{bestResult.netRealization.toLocaleString('en-IN')}
+                  </div>
+                  <div className="text-[10px] text-[#166534] font-semibold">100% Escrow protected</div>
+                </div>
+              </div>
+            )}
           </div>
 
         </div>
@@ -298,7 +326,7 @@ export const SmartMarketPredictor: React.FC = () => {
       {/* Alternative Market Realization Comparison Table */}
       <div>
         <h4 className="text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-3">
-          All Regional Markets Ranked by Net Realization ({marketResults.length})
+          {t('view_all_markets')} ({marketResults.length})
         </h4>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -306,7 +334,7 @@ export const SmartMarketPredictor: React.FC = () => {
             <div
               key={res.mandi.id}
               onClick={() => handleSelectMarket(res.mandi)}
-              className={`p-4 rounded-xl border transition-all cursor-pointer ${
+              className={`p-4.5 rounded-2xl border transition-all cursor-pointer touch-target ${
                 res.isRecommended
                   ? 'bg-[#F0FDF4] border-[#86EFAC] hover:border-[#2E7D32]'
                   : 'bg-white border-[#E5E7EB] hover:border-[#D1D5DB]'
@@ -314,14 +342,14 @@ export const SmartMarketPredictor: React.FC = () => {
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center space-x-2">
-                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-extrabold ${
                     res.isRecommended ? 'bg-[#2E7D32] text-white' : 'bg-[#F3F4F6] text-[#4B5563]'
                   }`}>
                     #{index + 1}
                   </span>
-                  <span className="font-bold text-xs text-[#1F2937] truncate max-w-[160px]">{res.mandi.name}</span>
+                  <span className="font-bold text-xs sm:text-sm text-[#1F2937] truncate max-w-[160px]">{res.mandi.name}</span>
                 </div>
-                <span className="text-[11px] font-mono font-bold text-[#6B7280]">{res.mandi.distanceKm} km</span>
+                <span className="text-xs font-mono font-bold text-[#6B7280]">🚜 {res.mandi.distanceKm} km</span>
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs my-2.5 pt-2 border-t border-[#E5E7EB]">
@@ -330,15 +358,15 @@ export const SmartMarketPredictor: React.FC = () => {
                   <div className="font-bold text-[#1F2937]">₹{res.grossPricePerQuintal}/q</div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-[#6B7280]">Net In-Hand</div>
-                  <div className="font-extrabold text-[#15803D] font-mono">₹{res.netRealization.toLocaleString('en-IN')}</div>
+                  <div className="text-[10px] text-[#15803D] font-bold">Net In-Hand</div>
+                  <div className="font-extrabold text-[#15803D] font-mono text-sm">₹{res.netRealization.toLocaleString('en-IN')}</div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-[#E5E7EB] text-[11px]">
+              <div className="flex items-center justify-between pt-2 border-t border-[#E5E7EB] text-xs">
                 <span className="text-[#6B7280] font-medium">{res.mandi.verifiedBuyersCount} Buyers</span>
                 <span className="text-[#2E7D32] font-bold flex items-center">
-                  Select <ChevronRight className="w-3 h-3 ml-0.5" />
+                  Select <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
                 </span>
               </div>
             </div>
@@ -349,3 +377,4 @@ export const SmartMarketPredictor: React.FC = () => {
     </div>
   );
 };
+

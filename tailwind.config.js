@@ -14,6 +14,12 @@ export default {
           leafHover: '#256629',
           amber: '#E67E22',
         },
+        dark: {
+          750: '#18241D',
+          800: '#111C15',
+          850: '#0C1710',
+          900: '#08100D',
+        },
         surface: {
           canvas: '#F8F9FA',
           card: '#FFFFFF',

@@ -20,7 +20,8 @@ import {
   ShieldCheck, 
   Sparkles,
   HelpCircle,
-  Truck
+  Truck,
+  Home
 } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -30,7 +31,7 @@ export const App: React.FC = () => {
     setActiveTab, 
     viewingMandiBuyers, 
     setViewingMandiBuyers, 
-    orders,
+    orders, 
     t 
   } = useApp();
 
@@ -40,13 +41,13 @@ export const App: React.FC = () => {
   const pendingFarmerOrdersCount = orders.filter(o => o.status === 'accepted').length;
 
   return (
-    <div className="min-h-screen bg-[#08100d] text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-[#F8F9FA] text-[#1F2937] flex flex-col font-sans">
       
       {/* Top Navbar */}
       <Navbar />
 
       {/* Sub Navigation Tabs for Farmer / Buyer */}
-      <div className="bg-dark-850/60 border-b border-slate-800/80 backdrop-blur-sm sticky top-16 sm:top-20 z-30">
+      <div className="bg-white border-b border-[#E5E7EB] sticky top-16 sm:top-18 z-30 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between overflow-x-auto no-scrollbar py-2">
             
@@ -56,54 +57,57 @@ export const App: React.FC = () => {
                 <>
                   <button
                     onClick={() => { setViewingMandiBuyers(null); setActiveTab('dashboard'); }}
-                    className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                    className={`flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer touch-target ${
                       activeTab === 'dashboard' && !viewingMandiBuyers
-                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-dark-750'
+                        ? 'bg-[#2E7D32] text-white shadow-sm'
+                        : 'text-[#4B5563] hover:text-[#1F2937] hover:bg-[#F3F4F6]'
                     }`}
                   >
                     <LayoutDashboard className="w-4 h-4" />
-                    <span>{t('farmer_role')} {t('back_to_dashboard') ? '' : 'Dashboard'}</span>
+                    <span>{t('home_nav')} (डैशबोर्ड)</span>
                   </button>
 
                   <button
                     onClick={() => { setViewingMandiBuyers(null); setActiveTab('orders'); }}
-                    className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition relative ${
+                    className={`flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold transition relative cursor-pointer touch-target ${
                       activeTab === 'orders'
-                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-dark-750'
+                        ? 'bg-[#2E7D32] text-white shadow-sm'
+                        : 'text-[#4B5563] hover:text-[#1F2937] hover:bg-[#F3F4F6]'
                     }`}
                   >
                     <Package className="w-4 h-4" />
-                    <span>{t('active_orders')}</span>
+                    <span>{t('my_orders_nav')} (सौदे)</span>
                     {pendingFarmerOrdersCount > 0 && (
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping ml-1" />
+                      <span className="w-2 h-2 rounded-full bg-[#15803D] animate-ping ml-1" />
                     )}
                   </button>
 
                   <button
                     onClick={() => { setViewingMandiBuyers(null); setActiveTab('demands'); }}
-                    className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
-                      activeTab === 'demands' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950' : 'text-slate-400 hover:text-slate-200 hover:bg-dark-750'
+                    className={`flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer touch-target ${
+                      activeTab === 'demands' 
+                        ? 'bg-[#2E7D32] text-white shadow-sm' 
+                        : 'text-[#4B5563] hover:text-[#1F2937] hover:bg-[#F3F4F6]'
                     }`}
                   >
                     <Store className="w-4 h-4" />
-                    <span>Buyer Demands</span>
+                    <span>{t('demands_nav')} (मांग)</span>
                   </button>
 
                   <button
+                    data-storage-btn="true"
                     onClick={() => setIsStorageModalOpen(true)}
-                    className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-dark-750 transition"
+                    className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-[#4B5563] hover:text-[#1F2937] hover:bg-[#F3F4F6] transition cursor-pointer touch-target"
                   >
-                    <Warehouse className="w-4 h-4" />
+                    <Warehouse className="w-4 h-4 text-[#2563EB]" />
                     <span>{t('warehouse_cold_storage')}</span>
                   </button>
 
                   <button
                     onClick={() => setIsQualityModalOpen(true)}
-                    className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-emerald-400 hover:bg-emerald-950/40 border border-emerald-800/40 rounded-xl transition"
+                    className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-[#15803D] bg-[#DCFCE7] hover:bg-[#BBF7D0] border border-[#86EFAC] transition cursor-pointer touch-target"
                   >
-                    <Scan className="w-4 h-4" />
+                    <Scan className="w-4 h-4 text-[#15803D]" />
                     <span>{t('ai_quality_assayer')}</span>
                   </button>
                 </>
@@ -113,18 +117,18 @@ export const App: React.FC = () => {
                 <>
                   <button
                     onClick={() => setActiveTab('dashboard')}
-                    className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white shadow-md shadow-emerald-950"
+                    className="flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[#2E7D32] text-white shadow-sm"
                   >
                     <LayoutDashboard className="w-4 h-4" />
-                    <span>{t('buyer_role')}</span>
+                    <span>{t('buyer_role')} Dashboard</span>
                   </button>
                 </>
               )}
 
               {role === 'logistics' && (
-                <button onClick={() => setActiveTab('dashboard')} className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-600 text-white shadow-md">
+                <button onClick={() => setActiveTab('dashboard')} className="flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[#E67E22] text-white shadow-sm">
                   <Truck className="w-4 h-4" />
-                  <span>Logistics</span>
+                  <span>Logistics Fleet</span>
                 </button>
               )}
 
@@ -132,7 +136,7 @@ export const App: React.FC = () => {
                 <>
                   <button
                     onClick={() => setActiveTab('dashboard')}
-                    className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-md shadow-blue-950"
+                    className="flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[#2563EB] text-white shadow-sm"
                   >
                     <Users className="w-4 h-4" />
                     <span>{t('fpo_pooling')}</span>
@@ -144,7 +148,7 @@ export const App: React.FC = () => {
                 <>
                   <button
                     onClick={() => setActiveTab('dashboard')}
-                    className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-purple-600 text-white shadow-md shadow-purple-950"
+                    className="flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-purple-600 text-white shadow-sm"
                   >
                     <ShieldCheck className="w-4 h-4" />
                     <span>{t('admin_role')}</span>
@@ -154,10 +158,10 @@ export const App: React.FC = () => {
 
             </div>
 
-            {/* Help & Workflow Guide Pill */}
-            <div className="hidden sm:flex items-center space-x-2 text-xs text-slate-400">
-              <span className="text-[11px] font-mono bg-dark-800 px-2.5 py-1 rounded-lg border border-slate-700">
-                End-to-End Simulation: Active
+            {/* Help Pill */}
+            <div className="hidden sm:flex items-center space-x-2 text-xs text-[#4B5563]">
+              <span className="text-[11px] font-mono bg-[#F3F4F6] px-2.5 py-1 rounded-lg border border-[#E5E7EB] font-bold text-[#15803D]">
+                ● Live APMC Connected
               </span>
             </div>
 
@@ -166,7 +170,7 @@ export const App: React.FC = () => {
       </div>
 
       {/* Main Content Viewport */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20 sm:pb-8">
         
         {/* If viewing a specific Mandi's buyers */}
         {viewingMandiBuyers ? (
@@ -195,10 +199,10 @@ export const App: React.FC = () => {
             )}
 
             {role === 'logistics' && (
-              <div className="glass-card rounded-3xl p-8 border border-amber-800/60 space-y-3">
-                <Truck className="w-10 h-10 text-amber-400" />
-                <h2 className="text-xl font-bold text-white">Logistics Dashboard</h2>
-                <p className="text-sm text-slate-300">Transport requests and fare proposals will appear here after a farmer and buyer complete a deal.</p>
+              <div className="clean-card rounded-3xl p-8 border border-amber-300 bg-white space-y-3">
+                <Truck className="w-10 h-10 text-[#E67E22]" />
+                <h2 className="text-xl font-bold text-[#1F2937]">Logistics Dashboard</h2>
+                <p className="text-sm text-[#4B5563]">Transport requests and fare proposals will appear here after a farmer and buyer complete a deal.</p>
               </div>
             )}
 
@@ -209,13 +213,13 @@ export const App: React.FC = () => {
 
             {/* Admin / Assayer View */}
             {role === 'admin' && (
-              <div className="glass-card rounded-3xl p-8 text-center space-y-4 border border-purple-800/60">
-                <ShieldCheck className="w-12 h-12 mx-auto text-purple-400" />
-                <h2 className="text-xl font-bold text-white">APMC Regulatory & Assaying Console</h2>
-                <p className="text-xs text-slate-300 max-w-xl mx-auto">
+              <div className="clean-card rounded-3xl p-8 text-center space-y-4 border border-purple-200 bg-white">
+                <ShieldCheck className="w-12 h-12 mx-auto text-purple-600" />
+                <h2 className="text-xl font-bold text-[#1F2937]">APMC Regulatory & Assaying Console</h2>
+                <p className="text-xs text-[#4B5563] max-w-xl mx-auto">
                   Audit live Mandi price transparency, monitor e-Way digital seals, verify third-party assaying disputes, and enforce zero-delay escrow payouts.
                 </p>
-                <div className="inline-flex items-center px-4 py-2 rounded-xl bg-emerald-950 text-emerald-300 text-xs font-bold border border-emerald-800">
+                <div className="inline-flex items-center px-4 py-2 rounded-xl bg-[#DCFCE7] text-[#15803D] text-xs font-bold border border-[#86EFAC]">
                   ✅ All 12 active trading channels operating in compliance with WDRA and APMC guidelines.
                 </div>
               </div>
@@ -225,16 +229,76 @@ export const App: React.FC = () => {
 
       </main>
 
+      {/* Mobile Bottom Navigation Bar (Visible only on phone screens for 1-thumb ease) */}
+      {role === 'farmer' && (
+        <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[#E5E7EB] shadow-lg px-2 py-1.5 flex items-center justify-around">
+          <button
+            onClick={() => { setViewingMandiBuyers(null); setActiveTab('dashboard'); }}
+            className={`flex flex-col items-center py-1 px-2 rounded-xl transition cursor-pointer touch-target ${
+              activeTab === 'dashboard' && !viewingMandiBuyers
+                ? 'text-[#2E7D32] font-extrabold'
+                : 'text-[#6B7280]'
+            }`}
+          >
+            <Home className="w-5 h-5 mb-0.5" />
+            <span className="text-[10px]">{t('home_nav')}</span>
+          </button>
+
+          <button
+            onClick={() => { setViewingMandiBuyers(null); setActiveTab('orders'); }}
+            className={`flex flex-col items-center py-1 px-2 rounded-xl transition relative cursor-pointer touch-target ${
+              activeTab === 'orders'
+                ? 'text-[#2E7D32] font-extrabold'
+                : 'text-[#6B7280]'
+            }`}
+          >
+            <Package className="w-5 h-5 mb-0.5" />
+            <span className="text-[10px]">{t('my_orders_nav')}</span>
+            {pendingFarmerOrdersCount > 0 && (
+              <span className="w-2 h-2 rounded-full bg-[#15803D] absolute top-1 right-2" />
+            )}
+          </button>
+
+          <button
+            onClick={() => { setViewingMandiBuyers(null); setActiveTab('demands'); }}
+            className={`flex flex-col items-center py-1 px-2 rounded-xl transition cursor-pointer touch-target ${
+              activeTab === 'demands'
+                ? 'text-[#2E7D32] font-extrabold'
+                : 'text-[#6B7280]'
+            }`}
+          >
+            <Store className="w-5 h-5 mb-0.5" />
+            <span className="text-[10px]">{t('demands_nav')}</span>
+          </button>
+
+          <button
+            onClick={() => setIsQualityModalOpen(true)}
+            className="flex flex-col items-center py-1 px-2 rounded-xl text-[#15803D] cursor-pointer touch-target"
+          >
+            <Scan className="w-5 h-5 mb-0.5 text-[#15803D]" />
+            <span className="text-[10px] font-bold">Quality</span>
+          </button>
+
+          <button
+            onClick={() => setIsStorageModalOpen(true)}
+            className="flex flex-col items-center py-1 px-2 rounded-xl text-[#2563EB] cursor-pointer touch-target"
+          >
+            <Warehouse className="w-5 h-5 mb-0.5 text-[#2563EB]" />
+            <span className="text-[10px]">Storage</span>
+          </button>
+        </div>
+      )}
+
       {/* Footer */}
-      <footer className="bg-dark-900 border-t border-emerald-950/60 py-6 mt-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+      <footer className="bg-white border-t border-[#E5E7EB] py-6 mt-12 hidden sm:block">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#6B7280]">
           <div className="flex items-center space-x-2">
-            <span className="font-bold text-slate-300 font-display">KisanSetu Platform</span>
+            <span className="font-extrabold text-[#1F2937]">KisanSetu Platform</span>
             <span>•</span>
             <span>AgriTech Market Intelligence & Smart Trade Engine</span>
           </div>
           <div>
-            Empowering Smallholders, FPOs & Verified Institutional Buyers with Data Transparency
+            Empowering Indian Farmers, FPOs & Verified Buyers with Live Transparency
           </div>
         </div>
       </footer>
@@ -254,3 +318,4 @@ export const App: React.FC = () => {
     </div>
   );
 };
+

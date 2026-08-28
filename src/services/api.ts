@@ -41,6 +41,11 @@ export interface BackendHealthResponse {
   data_store: string;
 }
 
+export interface ChatResponse {
+  reply: string;
+  intent: 'GENERAL_CROP' | 'ORDER_STATUS' | 'SHIPMENT_STATUS' | 'PROFIT' | 'PRICE_FORECAST' | 'UNKNOWN';
+}
+
 export const KisanSetuApi = {
   register: (payload: { name: string; phone: string; email?: string; password: string; role: AuthUserResponse['role']; profile: Record<string, unknown> }) => authRequest('/register', { method: 'POST', body: JSON.stringify(payload) }),
   login: (identifier: string, password: string) => authRequest('/login', { method: 'POST', body: JSON.stringify({ identifier, password }) }),
@@ -52,6 +57,10 @@ export const KisanSetuApi = {
   getMyOffers: (token: string) => protectedRequest('/offers', token),
   respondToOffer: (token: string, offerId: string, action: 'accept' | 'reject' | 'counter', payload?: unknown) => protectedRequest(`/offers/${offerId}/${action}`, token, { method: 'POST', body: payload ? JSON.stringify(payload) : undefined }),
   getDeals: (token: string) => protectedRequest('/demands/deals', token),
+  chat: (message: string): Promise<ChatResponse> => {
+    const token = localStorage.getItem('kisansetu_access_token') || '';
+    return protectedRequest('/chat', token, { method: 'POST', body: JSON.stringify({ message }) });
+  },
   // 1. Health check
   checkHealth: async (): Promise<BackendHealthResponse | null> => {
     try {
