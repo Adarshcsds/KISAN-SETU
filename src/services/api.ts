@@ -202,7 +202,15 @@ export const KisanSetuApi = {
 
   // Real Logistics Shipments
   getLogisticsShipments: (token: string) => protectedRequest('/logistics/shipments', token),
+  getLogisticsAvailableDeals: (token: string) => protectedRequest('/logistics/available-deals', token),
+  getBuyerShipments: (token: string) => protectedRequest('/logistics/buyer/shipments', token),
+  getFarmerShipments: (token: string) => protectedRequest('/logistics/farmer/shipments', token),
+  getShipment: (token: string, dealId: string) => protectedRequest(`/logistics/shipments/${dealId}`, token),
   acceptLogisticsShipment: (token: string, dealId: string) => protectedRequest(`/logistics/shipments/${dealId}/accept`, token, { method: 'POST' }),
+  approveLogisticsProvider: (token: string, dealId: string) => protectedRequest(`/logistics/shipments/${dealId}/approve-provider`, token, { method: 'POST' }),
+  rejectLogisticsProvider: (token: string, dealId: string) => protectedRequest(`/logistics/shipments/${dealId}/reject-provider`, token, { method: 'POST' }),
+  assignVehicle: (token: string, dealId: string, payload: unknown) => protectedRequest(`/logistics/shipments/${dealId}/vehicle`, token, { method: 'POST', body: JSON.stringify(payload) }),
+  updateShipmentLocation: (token: string, dealId: string, payload: unknown) => protectedRequest(`/logistics/shipments/${dealId}/location`, token, { method: 'POST', body: JSON.stringify(payload) }),
   dispatchLogisticsShipment: (token: string, dealId: string, payload: unknown) => protectedRequest(`/logistics/shipments/${dealId}/dispatch`, token, { method: 'POST', body: JSON.stringify(payload) }),
   markLogisticsInTransit: (token: string, dealId: string) => protectedRequest(`/logistics/shipments/${dealId}/transit`, token, { method: 'POST' }),
   markLogisticsDelivered: (token: string, dealId: string) => protectedRequest(`/logistics/shipments/${dealId}/deliver`, token, { method: 'POST' }),
