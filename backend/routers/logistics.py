@@ -12,6 +12,18 @@ from backend.database import get_connection
 router = APIRouter(prefix="/logistics", tags=["Logistics Shipments"])
 
 
+def _get_user_names(cur, user_ids):
+    """
+    Get user names from UUIDs.
+    Returns dict mapping user_id -> name
+    """
+    if not user_ids:
+        return {}
+    placeholders = ','.join(['%s'] * len(user_ids))
+    cur.execute(f"SELECT id, name FROM users WHERE id IN ({placeholders})", user_ids)
+    return {str(row[0]): row[1] for row in cur.fetchall()}
+
+
 class DispatchDetails(BaseModel):
     transporterName: str = Field(min_length=1, max_length=200)
     truckType: str = Field(min_length=1, max_length=120)
@@ -102,17 +114,81 @@ def available_deals(user=Depends(require_roles("logistics"))):
                         AND (s.id IS NULL OR s.status = 'AVAILABLE')
                     ORDER BY d.created_at ASC""")
             rows = cur.fetchall()
+            
+            # Fetch user names for farmers and buyers
+            user_ids = set()
+            for row in rows:
+                user_ids.add(row[2])  # farmer_id
+                user_ids.add(row[3])  # buyer_id
+            user_names = _get_user_names(cur, list(user_ids))
+            
             return [{
                 "tradeDealId": str(row[0]),
                 "dealCode": row[1],
                 "farmerId": str(row[2]),
+                "farmerName": user_names.get(str(row[2]), "Unknown"),
                 "buyerId": str(row[3]),
+                "buyerName": user_names.get(str(row[3]), "Unknown"),
                 "cropName": row[4],
                 "quantityQuintals": float(row[5]),
                 "pickupLocation": row[6],
                 "deliveryLocation": row[7],
                 "qualityGrade": row[8],
                 "status": "AVAILABLE" if row[9] in ('AGREED','READY_FOR_LOGISTICS') else row[9],
+            } for row in rows]
+    finally:
+        conn.close()
+
+
+@router.get("/buyer/shipments")
+def get_buyer_shipments(user=Depends(require_roles("buyer"))):
+    """
+    Get all shipments belonging to this buyer's trade deals.
+    Used for transport approval requests and tracking.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(SHIPMENT_SELECT + " WHERE d.buyer_id=%s ORDER BY s.updated_at DESC", (user["id"],))
+            rows = cur.fetchall()
+            
+            # Fetch user names for logistics providers
+            user_ids = set()
+            for row in rows:
+                if row[10]:  # provider_id
+                    user_ids.add(str(row[10]))
+            user_names = _get_user_names(cur, list(user_ids))
+            
+            return [{
+                **_shipment(row),
+                "providerName": user_names.get(str(row[10]), "Unknown") if row[10] else None,
+            } for row in rows]
+    finally:
+        conn.close()
+
+
+@router.get("/farmer/shipments")
+def get_farmer_shipments(user=Depends(require_roles("farmer"))):
+    """
+    Get all shipments belonging to this farmer's trade deals.
+    Used for tracking shipments.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(SHIPMENT_SELECT + " WHERE d.farmer_id=%s ORDER BY s.updated_at DESC", (user["id"],))
+            rows = cur.fetchall()
+            
+            # Fetch user names for logistics providers
+            user_ids = set()
+            for row in rows:
+                if row[10]:  # provider_id
+                    user_ids.add(str(row[10]))
+            user_names = _get_user_names(cur, list(user_ids))
+            
+            return [{
+                **_shipment(row),
+                "providerName": user_names.get(str(row[10]), "Unknown") if row[10] else None,
             } for row in rows]
     finally:
         conn.close()
@@ -126,10 +202,22 @@ def list_shipments(user=Depends(require_roles("logistics"))):
             available = _available_select(cur)
             cur.execute(SHIPMENT_SELECT + " WHERE s.provider_id=%s ORDER BY s.updated_at DESC", (user["id"],))
             assigned = cur.fetchall()
+            
+            # Get farmer and buyer names for available deals
+            available_user_ids = set()
+            for row in available:
+                available_user_ids.add(row[2])  # farmer_id
+                available_user_ids.add(row[3])  # buyer_id
+            available_names = _get_user_names(cur, list(available_user_ids)) if available_user_ids else {}
+            
             return [
-                {"tradeDealId": str(row[0]), "dealCode": row[1], "farmerId": str(row[2]), "buyerId": str(row[3]),
-                 "cropName": row[4], "quantityQuintals": float(row[5]), "pickupLocation": row[6],
-                 "deliveryLocation": row[7], "qualityGrade": row[8], "status": "AVAILABLE"}
+                {
+                    "tradeDealId": str(row[0]), "dealCode": row[1], 
+                    "farmerId": str(row[2]), "farmerName": available_names.get(str(row[2]), "Unknown"),
+                    "buyerId": str(row[3]), "buyerName": available_names.get(str(row[3]), "Unknown"),
+                    "cropName": row[4], "quantityQuintals": float(row[5]), "pickupLocation": row[6],
+                    "deliveryLocation": row[7], "qualityGrade": row[8], "status": "AVAILABLE"
+                }
                 for row in available
             ] + [_shipment(row) for row in assigned]
     finally:
@@ -247,6 +335,11 @@ def assign_vehicle(deal_id: str, details: VehicleAssignmentDetails, user=Depends
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            # Get logistics provider's firm name
+            cur.execute("SELECT firm_name FROM logistics_profiles WHERE user_id=%s", (user["id"],))
+            profile_row = cur.fetchone()
+            firm_name = profile_row[0] if profile_row else user.get("name", "Unknown")
+            
             cur.execute("SELECT s.id,s.status FROM logistics_shipments s WHERE s.trade_deal_id=%s AND s.provider_id=%s FOR UPDATE", (deal_id, user["id"]))
             shipment = cur.fetchone()
             if not shipment: raise HTTPException(404, "Shipment not found or not assigned to this provider")
@@ -255,7 +348,7 @@ def assign_vehicle(deal_id: str, details: VehicleAssignmentDetails, user=Depends
             cur.execute("""UPDATE logistics_shipments SET transporter_name=%s,truck_type=%s,license_plate=%s,
                 driver_name=%s,driver_phone=%s,current_location=%s,eta_text=%s,status='VEHICLE_ASSIGNED',updated_at=NOW()
                 WHERE trade_deal_id=%s AND provider_id=%s""",
-                (details.vehicleType, details.vehicleType, details.vehicleNumber, details.driverName,
+                (firm_name, details.vehicleType, details.vehicleNumber, details.driverName,
                  details.driverPhone, details.currentLocation, details.eta, deal_id, user["id"]))
             cur.execute(SHIPMENT_SELECT + " WHERE s.trade_deal_id=%s AND s.provider_id=%s", (deal_id, user["id"]))
             row = cur.fetchone()
@@ -376,7 +469,7 @@ def get_shipment(deal_id: str, user=Depends(require_roles("logistics", "farmer",
 def request_freight_payment(deal_id: str, user=Depends(require_roles("logistics"))):
     """
     Logistics provider requests freight payment from buyer.
-    Only available after shipment is ACCEPTED.
+    Only available after shipment is confirmed by buyer.
     """
     conn = get_connection()
     try:
@@ -390,8 +483,8 @@ def request_freight_payment(deal_id: str, user=Depends(require_roles("logistics"
             shipment = cur.fetchone()
             if not shipment: 
                 raise HTTPException(404, "Shipment not found or not assigned to this provider")
-            if shipment[1] not in ("ACCEPTED", "DISPATCHED", "IN_TRANSIT"):
-                raise HTTPException(409, "Freight payment can only be requested when shipment is accepted or dispatched")
+            if shipment[1] not in ("LOGISTICS_CONFIRMED", "VEHICLE_ASSIGNED", "DISPATCHED", "IN_TRANSIT", "DELIVERED"):
+                raise HTTPException(409, "Freight payment can only be requested after buyer confirms logistics")
             
             # Update payment status
             cur.execute("""
