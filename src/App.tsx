@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from './context/AppContext';
 import { Navbar } from './components/common/Navbar';
 import { FarmerDashboard } from './components/farmer/FarmerDashboard';
+import { KisanSetuApi } from './services/api';
 import { MarketBuyersView } from './components/farmer/MarketBuyersView';
 import { FarmerOrdersList } from './components/farmer/FarmerOrdersList';
 import { DemandMarketplace } from './components/farmer/DemandMarketplace';
@@ -37,8 +38,33 @@ export const App: React.FC = () => {
 
   const [isQualityModalOpen, setIsQualityModalOpen] = useState(false);
   const [isStorageModalOpen, setIsStorageModalOpen] = useState(false);
+  const [logisticsJobs, setLogisticsJobs] = useState<any[]>([]);
+  const [logisticsLoading, setLogisticsLoading] = useState(false);
+
+  useEffect(() => {
+    if (role !== 'logistics') return;
+    const token = localStorage.getItem('kisansetu_access_token');
+    if (!token) return;
+    setLogisticsLoading(true);
+    KisanSetuApi.getLogisticsShipments(token)
+      .then((jobs) => setLogisticsJobs(Array.isArray(jobs) ? jobs : []))
+      .catch(() => setLogisticsJobs([]))
+      .finally(() => setLogisticsLoading(false));
+  }, [role]);
 
   const pendingFarmerOrdersCount = orders.filter(o => o.status === 'accepted').length;
+
+  const handleAcceptJob = async (dealId: string) => {
+    const token = localStorage.getItem('kisansetu_access_token');
+    if (!token) return;
+    try {
+      await KisanSetuApi.acceptLogisticsShipment(token, dealId);
+      const refreshed = await KisanSetuApi.getLogisticsShipments(token);
+      setLogisticsJobs(Array.isArray(refreshed) ? refreshed : []);
+    } catch (error) {
+      console.error('Failed to accept logistics deal', error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-[#1F2937] flex flex-col font-sans">
@@ -199,10 +225,51 @@ export const App: React.FC = () => {
             )}
 
             {role === 'logistics' && (
-              <div className="clean-card rounded-3xl p-8 border border-amber-300 bg-white space-y-3">
-                <Truck className="w-10 h-10 text-[#E67E22]" />
-                <h2 className="text-xl font-bold text-[#1F2937]">Logistics Dashboard</h2>
-                <p className="text-sm text-[#4B5563]">Transport requests and fare proposals will appear here after a farmer and buyer complete a deal.</p>
+              <div className="space-y-6">
+                <div className="clean-card rounded-3xl p-8 border border-amber-300 bg-white space-y-3">
+                  <Truck className="w-10 h-10 text-[#E67E22]" />
+                  <h2 className="text-xl font-bold text-[#1F2937]">Logistics Dashboard</h2>
+                  <p className="text-sm text-[#4B5563]">Available deals from real trade agreements are listed here. Each accepted job is claimed once and then moves to buyer approval.</p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {logisticsLoading ? (
+                    <div className="col-span-full text-sm text-[#4B5563]">Loading transport jobs…</div>
+                  ) : logisticsJobs.length === 0 ? (
+                    <div className="col-span-full text-sm text-[#4B5563]">No available transport jobs right now.</div>
+                  ) : (
+                    logisticsJobs.map((job: any) => (
+                      <div key={job.tradeDealId || job.id} className="clean-card rounded-3xl p-5 border border-[#F3F4F6] bg-white space-y-3">
+                        <div className="flex justify-between items-start gap-3">
+                          <div>
+                            <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#E67E22]">{job.dealCode || job.tradeDealId || 'DEAL'}</div>
+                            <h3 className="text-lg font-bold text-[#1F2937]">{job.cropName || 'Crop'}</h3>
+                          </div>
+                          <span className="px-2 py-1 rounded-full bg-[#FFF7ED] text-[#C2410C] text-[10px] font-bold uppercase">{job.status || 'AVAILABLE'}</span>
+                        </div>
+
+                        <div className="space-y-1 text-sm text-[#374151]">
+                          <p><span className="font-semibold">Farmer:</span> {job.farmerId || '—'}</p>
+                          <p><span className="font-semibold">Buyer:</span> {job.buyerId || '—'}</p>
+                          <p><span className="font-semibold">Quantity:</span> {job.quantityQuintals || 0} Quintals</p>
+                          <p><span className="font-semibold">Pickup:</span> {job.pickupLocation || '—'}</p>
+                          <p><span className="font-semibold">Destination:</span> {job.deliveryLocation || '—'}</p>
+                        </div>
+
+                        {job.status === 'AVAILABLE' || job.status === 'AGREED' ? (
+                          <button
+                            onClick={() => handleAcceptJob(job.tradeDealId || job.id)}
+                            className="w-full px-4 py-2 rounded-xl bg-[#E67E22] text-white text-sm font-bold hover:bg-[#C96A16] transition"
+                          >
+                            Accept Deal
+                          </button>
+                        ) : (
+                          <div className="text-xs font-semibold text-[#6B7280]">Waiting for buyer confirmation or active shipment update.</div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             )}
 
