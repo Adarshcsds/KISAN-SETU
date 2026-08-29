@@ -43,7 +43,14 @@ export interface BackendHealthResponse {
 
 export interface ChatResponse {
   reply: string;
-  intent: 'GENERAL_CROP' | 'ORDER_STATUS' | 'SHIPMENT_STATUS' | 'PROFIT' | 'PRICE_FORECAST' | 'UNKNOWN';
+  intent:
+  | 'GENERAL_CROP'
+  | 'PLANTING'
+  | 'ORDER_STATUS'
+  | 'SHIPMENT_STATUS'
+  | 'PROFIT'
+  | 'PRICE_FORECAST'
+  | 'UNKNOWN';
 }
 
 export const KisanSetuApi = {
