@@ -157,12 +157,46 @@ def initialize_auth_schema():
                     freight_amount NUMERIC(14,2), gate_pass_id VARCHAR(40) UNIQUE,
                     status VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE'
                         CHECK (status IN ('AVAILABLE','ACCEPTED','DISPATCHED','IN_TRANSIT','DELIVERED','COMPLETED')),
+                    freight_payment_status VARCHAR(20) DEFAULT 'PENDING' 
+                        CHECK (freight_payment_status IN ('PENDING','REQUESTED','APPROVED','REJECTED','PAID')),
                     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                     dispatched_at TIMESTAMPTZ, delivered_at TIMESTAMPTZ
                 )
             """)
+            cur.execute("ALTER TABLE logistics_shipments ADD COLUMN IF NOT EXISTS freight_payment_status VARCHAR(20) DEFAULT 'PENDING' CHECK (freight_payment_status IN ('PENDING','REQUESTED','APPROVED','REJECTED','PAID'))")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_logistics_shipments_provider ON logistics_shipments(provider_id, status)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_logistics_shipments_status ON logistics_shipments(status)")
+            
+            # Community Tables
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS communities (
+                    id UUID PRIMARY KEY,
+                    name VARCHAR(200) NOT NULL,
+                    description TEXT,
+                    location TEXT NOT NULL,
+                    district VARCHAR(120) NOT NULL,
+                    state VARCHAR(120) NOT NULL,
+                    crop_focus VARCHAR(120),
+                    leader_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','INACTIVE','SUSPENDED')),
+                    member_count INTEGER NOT NULL DEFAULT 1,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS community_members (
+                    id BIGSERIAL PRIMARY KEY,
+                    community_id UUID NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
+                    farmer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    role VARCHAR(20) NOT NULL DEFAULT 'MEMBER' CHECK (role IN ('LEADER','ADMIN','MEMBER')),
+                    joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    UNIQUE(community_id, farmer_id)
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_community_members_community ON community_members(community_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_community_members_farmer ON community_members(farmer_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_communities_leader ON communities(leader_id)")
         conn.commit()
     finally:
         conn.close()

@@ -204,3 +204,33 @@ class ForecastResponse(BaseModel):
     advisoryText: str
     confidencePercent: int
     estimatedGainPerQtl: float
+
+class Community(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    location: str
+    district: str
+    state: str
+    cropFocus: Optional[str] = None
+    leaderId: str
+    leaderName: Optional[str] = None
+    status: Literal['ACTIVE', 'INACTIVE', 'SUSPENDED'] = 'ACTIVE'
+    memberCount: int = 1
+    createdAt: str
+    updatedAt: Optional[str] = None
+
+class CreateCommunityRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=1000)
+    location: str = Field(min_length=1, max_length=500)
+    district: str = Field(min_length=1, max_length=120)
+    state: str = Field(min_length=1, max_length=120)
+    cropFocus: Optional[str] = Field(default=None, max_length=120)
+
+class CommunityMember(BaseModel):
+    communityId: str
+    farmerId: str
+    farmerName: Optional[str] = None
+    role: Literal['LEADER', 'ADMIN', 'MEMBER'] = 'MEMBER'
+    joinedAt: str

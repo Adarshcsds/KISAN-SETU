@@ -9,6 +9,7 @@ from backend.routers import logistics
 from backend.routers import mandis
 from backend.routers import orders
 from backend.routers import predictions
+from backend.routers import communities
 
 app = FastAPI(
     title="KisanSetu (किसानसेतु) Agri-Market API",
@@ -41,6 +42,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(demands.router, prefix="/api")
 app.include_router(demands.offer_router, prefix="/api")
 app.include_router(logistics.router, prefix="/api")
+app.include_router(communities.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
 
 @app.on_event("startup")
