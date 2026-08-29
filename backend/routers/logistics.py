@@ -22,6 +22,20 @@ class DispatchDetails(BaseModel):
     freightAmount: float = Field(gt=0)
 
 
+class VehicleAssignmentDetails(BaseModel):
+    vehicleNumber: str = Field(min_length=1, max_length=40)
+    vehicleType: str = Field(min_length=1, max_length=120)
+    driverName: str = Field(min_length=1, max_length=120)
+    driverPhone: str = Field(min_length=8, max_length=20)
+    currentLocation: str = Field(min_length=1, max_length=200)
+    eta: str = Field(min_length=1, max_length=80)
+
+
+class LocationUpdate(BaseModel):
+    currentLocation: str = Field(min_length=1, max_length=200)
+    eta: str | None = Field(default=None, max_length=80)
+
+
 def _shipment(row):
     return {
         "id": str(row[0]),
@@ -44,6 +58,8 @@ def _shipment(row):
         "freightAmount": float(row[17]) if row[17] is not None else None,
         "gatePassId": row[18],
         "status": row[19],
+        "currentLocation": row[24],
+        "etaText": row[25],
         "createdAt": row[20].isoformat(),
         "updatedAt": row[21].isoformat(),
         "dispatchedAt": row[22].isoformat() if row[22] else None,
@@ -54,7 +70,8 @@ def _shipment(row):
 SHIPMENT_SELECT = """SELECT s.id,s.trade_deal_id,d.deal_code,d.farmer_id,d.buyer_id,d.crop_name,
  d.agreed_quantity_quintals,d.pickup_location,d.delivery_location,d.quality_grade,s.provider_id,
  s.transporter_name,s.truck_type,s.license_plate,s.driver_name,s.driver_phone,s.distance_km,
- s.freight_amount,s.gate_pass_id,s.status,s.created_at,s.updated_at,s.dispatched_at,s.delivered_at
+ s.freight_amount,s.gate_pass_id,s.status,s.created_at,s.updated_at,s.dispatched_at,s.delivered_at,
+ s.current_location,s.eta_text
  FROM logistics_shipments s JOIN trade_deals d ON d.id=s.trade_deal_id"""
 
 
@@ -62,14 +79,43 @@ def _available_select(cur):
     cur.execute("""SELECT d.id,d.deal_code,d.farmer_id,d.buyer_id,d.crop_name,d.agreed_quantity_quintals,
         d.pickup_location,d.delivery_location,d.quality_grade
                 FROM trade_deals d
-                WHERE d.status='AGREED'
+                WHERE d.status IN ('AGREED','READY_FOR_LOGISTICS')
                     AND NOT EXISTS (
                             SELECT 1 FROM logistics_shipments s
                             WHERE s.trade_deal_id=d.id
-                                AND s.status IN ('ACCEPTED','DISPATCHED','IN_TRANSIT')
+                              AND s.status IN ('ACCEPTED','WAITING_BUYER_APPROVAL','LOGISTICS_CONFIRMED','VEHICLE_ASSIGNED','DISPATCHED','IN_TRANSIT','DELIVERED','COMPLETED')
                     )
                 ORDER BY d.created_at ASC""")
     return cur.fetchall()
+
+
+@router.get("/available-deals")
+def available_deals(user=Depends(require_roles("logistics"))):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT d.id,d.deal_code,d.farmer_id,d.buyer_id,d.crop_name,d.agreed_quantity_quintals,
+                d.pickup_location,d.delivery_location,d.quality_grade,d.status
+                    FROM trade_deals d
+                    LEFT JOIN logistics_shipments s ON s.trade_deal_id=d.id
+                    WHERE d.status IN ('AGREED','READY_FOR_LOGISTICS')
+                        AND (s.id IS NULL OR s.status = 'AVAILABLE')
+                    ORDER BY d.created_at ASC""")
+            rows = cur.fetchall()
+            return [{
+                "tradeDealId": str(row[0]),
+                "dealCode": row[1],
+                "farmerId": str(row[2]),
+                "buyerId": str(row[3]),
+                "cropName": row[4],
+                "quantityQuintals": float(row[5]),
+                "pickupLocation": row[6],
+                "deliveryLocation": row[7],
+                "qualityGrade": row[8],
+                "status": "AVAILABLE" if row[9] in ('AGREED','READY_FOR_LOGISTICS') else row[9],
+            } for row in rows]
+    finally:
+        conn.close()
 
 
 @router.get("/shipments")
@@ -98,17 +144,19 @@ def accept_shipment(deal_id: str, user=Depends(require_roles("logistics"))):
             cur.execute("SELECT id,status FROM trade_deals WHERE id=%s FOR UPDATE", (deal_id,))
             deal = cur.fetchone()
             if not deal: raise HTTPException(404, "Trade deal not found")
-            if deal[1] != "AGREED": raise HTTPException(409, "Only AGREED deals can be accepted for transport")
+            if deal[1] not in ("AGREED", "READY_FOR_LOGISTICS"):
+                raise HTTPException(409, "Only agreed deals can be accepted for transport")
             cur.execute("SELECT id,provider_id,status FROM logistics_shipments WHERE trade_deal_id=%s FOR UPDATE", (deal_id,))
             existing = cur.fetchone()
             if existing:
-                if str(existing[1]) != user["id"] or existing[2] != "AVAILABLE":
-                    raise HTTPException(409, "This shipment has already been claimed")
-                shipment_id = str(existing[0])
-                cur.execute("UPDATE logistics_shipments SET status='ACCEPTED',updated_at=NOW() WHERE id=%s", (shipment_id,))
+                if str(existing[1]) == user["id"]:
+                    shipment_id = str(existing[0])
+                    cur.execute("UPDATE logistics_shipments SET status='WAITING_BUYER_APPROVAL',updated_at=NOW() WHERE id=%s", (shipment_id,))
+                else:
+                    raise HTTPException(409, "This deal has already been claimed by another logistics provider")
             else:
                 shipment_id = str(uuid.uuid4())
-                cur.execute("INSERT INTO logistics_shipments (id,trade_deal_id,provider_id,status) VALUES (%s,%s,%s,'ACCEPTED')", (shipment_id, deal_id, user["id"]))
+                cur.execute("INSERT INTO logistics_shipments (id,trade_deal_id,provider_id,status,updated_at) VALUES (%s,%s,%s,'WAITING_BUYER_APPROVAL',NOW())", (shipment_id, deal_id, user["id"]))
             cur.execute(SHIPMENT_SELECT + " WHERE s.id=%s", (shipment_id,))
             row = cur.fetchone()
         conn.commit()
@@ -146,12 +194,108 @@ def _transition(cur, deal_id, provider_id, expected_status, next_status, details
     return _shipment(cur.fetchone())
 
 
+@router.post("/shipments/{deal_id}/approve-provider")
+def approve_provider(deal_id: str, user=Depends(require_roles("buyer"))):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT s.id,s.provider_id,s.status FROM logistics_shipments s
+                JOIN trade_deals d ON d.id=s.trade_deal_id
+                WHERE s.trade_deal_id=%s AND d.buyer_id=%s FOR UPDATE""", (deal_id, user["id"]))
+            shipment = cur.fetchone()
+            if not shipment: raise HTTPException(404, "Shipment not found for this deal")
+            if shipment[2] not in ("ACCEPTED", "WAITING_BUYER_APPROVAL"):
+                raise HTTPException(409, "This logistics provider is not awaiting buyer approval")
+            cur.execute("UPDATE logistics_shipments SET status='LOGISTICS_CONFIRMED',updated_at=NOW() WHERE trade_deal_id=%s", (deal_id,))
+            cur.execute(SHIPMENT_SELECT + " WHERE s.trade_deal_id=%s", (deal_id,))
+            row = cur.fetchone()
+        conn.commit()
+        return _shipment(row)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@router.post("/shipments/{deal_id}/reject-provider")
+def reject_provider(deal_id: str, user=Depends(require_roles("buyer"))):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT s.id,s.provider_id,s.status FROM logistics_shipments s
+                JOIN trade_deals d ON d.id=s.trade_deal_id
+                WHERE s.trade_deal_id=%s AND d.buyer_id=%s FOR UPDATE""", (deal_id, user["id"]))
+            shipment = cur.fetchone()
+            if not shipment: raise HTTPException(404, "Shipment not found for this deal")
+            if shipment[2] not in ("ACCEPTED", "WAITING_BUYER_APPROVAL"):
+                raise HTTPException(409, "This logistics provider cannot be rejected right now")
+            cur.execute("UPDATE logistics_shipments SET provider_id=NULL,status='AVAILABLE',updated_at=NOW() WHERE trade_deal_id=%s", (deal_id,))
+            cur.execute(SHIPMENT_SELECT + " WHERE s.trade_deal_id=%s", (deal_id,))
+            row = cur.fetchone()
+        conn.commit()
+        return _shipment(row)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@router.post("/shipments/{deal_id}/vehicle")
+def assign_vehicle(deal_id: str, details: VehicleAssignmentDetails, user=Depends(require_roles("logistics"))):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT s.id,s.status FROM logistics_shipments s WHERE s.trade_deal_id=%s AND s.provider_id=%s FOR UPDATE", (deal_id, user["id"]))
+            shipment = cur.fetchone()
+            if not shipment: raise HTTPException(404, "Shipment not found or not assigned to this provider")
+            if shipment[1] not in ("LOGISTICS_CONFIRMED", "VEHICLE_ASSIGNED"):
+                raise HTTPException(409, "Vehicle can only be assigned after buyer approves the logistics provider")
+            cur.execute("""UPDATE logistics_shipments SET transporter_name=%s,truck_type=%s,license_plate=%s,
+                driver_name=%s,driver_phone=%s,current_location=%s,eta_text=%s,status='VEHICLE_ASSIGNED',updated_at=NOW()
+                WHERE trade_deal_id=%s AND provider_id=%s""",
+                (details.vehicleType, details.vehicleType, details.vehicleNumber, details.driverName,
+                 details.driverPhone, details.currentLocation, details.eta, deal_id, user["id"]))
+            cur.execute(SHIPMENT_SELECT + " WHERE s.trade_deal_id=%s AND s.provider_id=%s", (deal_id, user["id"]))
+            row = cur.fetchone()
+        conn.commit()
+        return _shipment(row)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@router.post("/shipments/{deal_id}/location")
+def update_location(deal_id: str, details: LocationUpdate, user=Depends(require_roles("logistics"))):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id,status FROM logistics_shipments WHERE trade_deal_id=%s AND provider_id=%s FOR UPDATE", (deal_id, user["id"]))
+            shipment = cur.fetchone()
+            if not shipment: raise HTTPException(404, "Shipment not found or not assigned to this provider")
+            if shipment[1] not in ("VEHICLE_ASSIGNED", "DISPATCHED", "IN_TRANSIT", "DELIVERED"):
+                raise HTTPException(409, "Location can only be updated once the shipment is assigned")
+            cur.execute("UPDATE logistics_shipments SET current_location=%s,eta_text=%s,updated_at=NOW() WHERE trade_deal_id=%s AND provider_id=%s", (details.currentLocation, details.eta or 'Pending', deal_id, user["id"]))
+            cur.execute(SHIPMENT_SELECT + " WHERE s.trade_deal_id=%s AND s.provider_id=%s", (deal_id, user["id"]))
+            row = cur.fetchone()
+        conn.commit()
+        return _shipment(row)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 @router.post("/shipments/{deal_id}/dispatch")
 def dispatch_shipment(deal_id: str, details: DispatchDetails, user=Depends(require_roles("logistics"))):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            result = _transition(cur, deal_id, user["id"], "ACCEPTED", "DISPATCHED", details)
+            result = _transition(cur, deal_id, user["id"], "VEHICLE_ASSIGNED", "DISPATCHED", details)
         conn.commit()
         return result
     except Exception:

@@ -155,8 +155,9 @@ def initialize_auth_schema():
                     transporter_name VARCHAR(200), truck_type VARCHAR(120), license_plate VARCHAR(40),
                     driver_name VARCHAR(120), driver_phone VARCHAR(20), distance_km NUMERIC(10,2),
                     freight_amount NUMERIC(14,2), gate_pass_id VARCHAR(40) UNIQUE,
-                    status VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE'
-                        CHECK (status IN ('AVAILABLE','ACCEPTED','DISPATCHED','IN_TRANSIT','DELIVERED','COMPLETED')),
+                    current_location VARCHAR(200), eta_text VARCHAR(80),
+                    status VARCHAR(30) NOT NULL DEFAULT 'AVAILABLE'
+                        CHECK (status IN ('AVAILABLE','ACCEPTED','WAITING_BUYER_APPROVAL','LOGISTICS_CONFIRMED','VEHICLE_ASSIGNED','DISPATCHED','IN_TRANSIT','DELIVERED','COMPLETED')),
                     freight_payment_status VARCHAR(20) DEFAULT 'PENDING' 
                         CHECK (freight_payment_status IN ('PENDING','REQUESTED','APPROVED','REJECTED','PAID')),
                     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -164,6 +165,10 @@ def initialize_auth_schema():
                 )
             """)
             cur.execute("ALTER TABLE logistics_shipments ADD COLUMN IF NOT EXISTS freight_payment_status VARCHAR(20) DEFAULT 'PENDING' CHECK (freight_payment_status IN ('PENDING','REQUESTED','APPROVED','REJECTED','PAID'))")
+            cur.execute("ALTER TABLE logistics_shipments ADD COLUMN IF NOT EXISTS current_location VARCHAR(200)")
+            cur.execute("ALTER TABLE logistics_shipments ADD COLUMN IF NOT EXISTS eta_text VARCHAR(80)")
+            cur.execute("ALTER TABLE logistics_shipments DROP CONSTRAINT IF EXISTS logistics_shipments_status_check")
+            cur.execute("ALTER TABLE logistics_shipments ADD CONSTRAINT logistics_shipments_status_check CHECK (status IN ('AVAILABLE','ACCEPTED','WAITING_BUYER_APPROVAL','LOGISTICS_CONFIRMED','VEHICLE_ASSIGNED','DISPATCHED','IN_TRANSIT','DELIVERED','COMPLETED'))")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_logistics_shipments_provider ON logistics_shipments(provider_id, status)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_logistics_shipments_status ON logistics_shipments(status)")
             
