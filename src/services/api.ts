@@ -194,5 +194,30 @@ export const KisanSetuApi = {
       console.warn('[KisanSetuApi] Fallback to local settlement', e);
       return null;
     }
-  }
+  },
+
+  // Real Orders from Database
+  getMyRealOrders: (token: string) => protectedRequest('/orders/my-orders', token),
+  getAllRealDeals: (token: string) => protectedRequest('/orders/real-deals', token),
+
+  // Real Logistics Shipments
+  getLogisticsShipments: (token: string) => protectedRequest('/logistics/shipments', token),
+  acceptLogisticsShipment: (token: string, dealId: string) => protectedRequest(`/logistics/shipments/${dealId}/accept`, token, { method: 'POST' }),
+  dispatchLogisticsShipment: (token: string, dealId: string, payload: unknown) => protectedRequest(`/logistics/shipments/${dealId}/dispatch`, token, { method: 'POST', body: JSON.stringify(payload) }),
+  markLogisticsInTransit: (token: string, dealId: string) => protectedRequest(`/logistics/shipments/${dealId}/transit`, token, { method: 'POST' }),
+  markLogisticsDelivered: (token: string, dealId: string) => protectedRequest(`/logistics/shipments/${dealId}/deliver`, token, { method: 'POST' }),
+  completeLogisticsShipment: (token: string, dealId: string) => protectedRequest(`/logistics/shipments/${dealId}/complete`, token, { method: 'POST' }),
+
+  // Transport Payment Flow
+  requestFreightPayment: (token: string, dealId: string) => protectedRequest(`/logistics/shipments/${dealId}/request-freight-payment`, token, { method: 'POST' }),
+  approveFreightPayment: (token: string, dealId: string) => protectedRequest(`/logistics/shipments/${dealId}/approve-freight-payment`, token, { method: 'POST' }),
+  rejectFreightPayment: (token: string, dealId: string) => protectedRequest(`/logistics/shipments/${dealId}/reject-freight-payment`, token, { method: 'POST' }),
+
+  // Communities
+  createCommunity: (token: string, payload: unknown) => protectedRequest('/communities', token, { method: 'POST', body: JSON.stringify(payload) }),
+  listCommunities: (token: string) => protectedRequest('/communities', token),
+  getCommunity: (token: string, communityId: string) => protectedRequest(`/communities/${communityId}`, token),
+  joinCommunity: (token: string, communityId: string) => protectedRequest(`/communities/${communityId}/join`, token, { method: 'POST' }),
+  leaveCommunity: (token: string, communityId: string) => protectedRequest(`/communities/${communityId}/leave`, token, { method: 'POST' }),
+  transferCommunityLeadership: (token: string, communityId: string, newLeaderId: string) => protectedRequest(`/communities/${communityId}/transfer-leadership?new_leader_id=${newLeaderId}`, token, { method: 'POST' })
 };

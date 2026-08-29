@@ -222,3 +222,127 @@ def get_shipment(deal_id: str, user=Depends(require_roles("logistics", "farmer",
             return _shipment(row)
     finally:
         conn.close()
+
+
+# ============================================================
+# TRANSPORT PAYMENT REQUEST WORKFLOW
+# ============================================================
+
+@router.post("/shipments/{deal_id}/request-freight-payment")
+def request_freight_payment(deal_id: str, user=Depends(require_roles("logistics"))):
+    """
+    Logistics provider requests freight payment from buyer.
+    Only available after shipment is ACCEPTED.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            # Verify ownership and status
+            cur.execute("""
+                SELECT s.id, s.status, s.freight_payment_status, s.freight_amount
+                FROM logistics_shipments s
+                WHERE s.trade_deal_id=%s AND s.provider_id=%s
+            """, (deal_id, user["id"]))
+            shipment = cur.fetchone()
+            if not shipment: 
+                raise HTTPException(404, "Shipment not found or not assigned to this provider")
+            if shipment[1] not in ("ACCEPTED", "DISPATCHED", "IN_TRANSIT"):
+                raise HTTPException(409, "Freight payment can only be requested when shipment is accepted or dispatched")
+            
+            # Update payment status
+            cur.execute("""
+                UPDATE logistics_shipments 
+                SET freight_payment_status='REQUESTED', updated_at=NOW()
+                WHERE trade_deal_id=%s
+            """, (deal_id,))
+            
+            # Return updated shipment
+            cur.execute(SHIPMENT_SELECT + " WHERE s.trade_deal_id=%s", (deal_id,))
+            row = cur.fetchone()
+        conn.commit()
+        return _shipment(row)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@router.post("/shipments/{deal_id}/approve-freight-payment")
+def approve_freight_payment(deal_id: str, user=Depends(require_roles("buyer"))):
+    """
+    Buyer approves freight payment request from logistics provider.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            # Verify buyer ownership and payment status
+            cur.execute("""
+                SELECT s.id, s.freight_payment_status
+                FROM logistics_shipments s
+                JOIN trade_deals d ON d.id=s.trade_deal_id
+                WHERE d.id=%s AND d.buyer_id=%s
+            """, (deal_id, user["id"]))
+            shipment = cur.fetchone()
+            if not shipment: 
+                raise HTTPException(404, "Shipment not found or not owned by this buyer")
+            if shipment[1] != "REQUESTED":
+                raise HTTPException(409, "Payment can only be approved if it's been requested")
+            
+            # Update payment status
+            cur.execute("""
+                UPDATE logistics_shipments 
+                SET freight_payment_status='APPROVED', updated_at=NOW()
+                WHERE trade_deal_id=%s
+            """, (deal_id,))
+            
+            # Return updated shipment
+            cur.execute(SHIPMENT_SELECT + " WHERE s.trade_deal_id=%s", (deal_id,))
+            row = cur.fetchone()
+        conn.commit()
+        return _shipment(row)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@router.post("/shipments/{deal_id}/reject-freight-payment")
+def reject_freight_payment(deal_id: str, user=Depends(require_roles("buyer"))):
+    """
+    Buyer rejects freight payment request from logistics provider.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            # Verify buyer ownership and payment status
+            cur.execute("""
+                SELECT s.id, s.freight_payment_status
+                FROM logistics_shipments s
+                JOIN trade_deals d ON d.id=s.trade_deal_id
+                WHERE d.id=%s AND d.buyer_id=%s
+            """, (deal_id, user["id"]))
+            shipment = cur.fetchone()
+            if not shipment: 
+                raise HTTPException(404, "Shipment not found or not owned by this buyer")
+            if shipment[1] != "REQUESTED":
+                raise HTTPException(409, "Payment can only be rejected if it's been requested")
+            
+            # Update payment status back to pending
+            cur.execute("""
+                UPDATE logistics_shipments 
+                SET freight_payment_status='REJECTED', updated_at=NOW()
+                WHERE trade_deal_id=%s
+            """, (deal_id,))
+            
+            # Return updated shipment
+            cur.execute(SHIPMENT_SELECT + " WHERE s.trade_deal_id=%s", (deal_id,))
+            row = cur.fetchone()
+        conn.commit()
+        return _shipment(row)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()

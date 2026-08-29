@@ -1,7 +1,9 @@
 import random
-from datetime import datetime
-from fastapi import APIRouter, HTTPException
-from typing import List
+import uuid
+from datetime import datetime, timezone
+from decimal import Decimal
+from fastapi import APIRouter, HTTPException, Depends
+from typing import List, Optional
 from backend.models import (
     OrderRequest, 
     CreateProposalRequest, 
@@ -12,12 +14,46 @@ from backend.models import (
     PaymentReceipt
 )
 from backend.data_store import db
+from backend.database import get_connection
+from backend.auth import get_current_user, require_roles
 
 router = APIRouter(prefix="/orders", tags=["Bi-Directional Orders & Settlements"])
 
+def _order_from_deal(row):
+    """Convert trade_deal database row to OrderRequest format for API responses."""
+    # row: id, deal_code, farmer_id, buyer_id, crop_name, agreed_quantity_quintals, agreed_price_per_quintal, 
+    #      gross_amount, pickup_location, delivery_location, quality_grade, deal_password, status, created_at
+    return OrderRequest(
+        id=str(row[0]),
+        cropId=row[4].lower().replace(' ', '_'),  # Approximate crop ID from name
+        cropName=row[4],
+        variety="",  # Not stored in trade_deals
+        quantityQuintals=float(row[5]),
+        proposedPricePerQuintal=float(row[6]),
+        farmerId=str(row[2]),
+        farmerName="",  # Will be fetched separately if needed
+        farmerPhone="",
+        farmerLocation=row[8],
+        farmerDistrict="",  # Will be fetched separately if needed
+        buyerId=str(row[3]),
+        buyerName="",  # Will be fetched separately if needed
+        buyerCompany="",
+        targetMarketId="",
+        targetMarketName="",
+        status=row[12].lower() if row[12] else "pending",  # Map AGREED -> pending, etc.
+        orderOrigin="farmer_proposal",  # Default; actual may vary
+        moisturePercent=12.0,
+        expectedLossPercent=2.0,
+        qualityGrade=row[10],
+        grossAmount=float(row[7]),
+        freightCost=0.0,  # Would need to query logistics_shipments for actual
+        calculatedNetRealization=float(row[7]),
+        createdAt=row[13].isoformat() if row[13] else datetime.now().isoformat()
+    )
+
 @router.get("", response_model=List[OrderRequest])
 def get_all_orders():
-    """Retrieve all active and completed trade orders."""
+    """Retrieve all active and completed trade orders (demo + real combined)."""
     return list(db.orders.values())
 
 @router.post("/proposal", response_model=OrderRequest)
@@ -193,3 +229,129 @@ def settle_payment_escrow(order_id: str):
     order.status = "settled"
     order.paymentReceipt = receipt
     return order
+
+
+# ============================================================
+# REAL DATABASE ORDERS ENDPOINTS (Query trade_deals)
+# ============================================================
+
+@router.get("/my-orders")
+def get_my_real_orders(user=Depends(require_roles("farmer", "buyer"))):
+    """Get all real orders/deals for the logged-in farmer or buyer from database."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            if user["role"] == "farmer":
+                # Farmer sees deals where they are the farmer
+                cur.execute("""
+                    SELECT d.id, d.deal_code, d.farmer_id, d.buyer_id, d.crop_name, 
+                           d.agreed_quantity_quintals, d.agreed_price_per_quintal, d.gross_amount,
+                           d.pickup_location, d.delivery_location, d.quality_grade, d.deal_password, 
+                           d.status, d.created_at, u.name, b.firm_name, u.phone
+                    FROM trade_deals d
+                    JOIN users u ON u.id = d.farmer_id
+                    JOIN buyer_profiles b ON b.user_id = d.buyer_id
+                    WHERE d.farmer_id = %s
+                    ORDER BY d.created_at DESC
+                """, (user["id"],))
+            else:  # buyer
+                # Buyer sees deals where they are the buyer
+                cur.execute("""
+                    SELECT d.id, d.deal_code, d.farmer_id, d.buyer_id, d.crop_name, 
+                           d.agreed_quantity_quintals, d.agreed_price_per_quintal, d.gross_amount,
+                           d.pickup_location, d.delivery_location, d.quality_grade, d.deal_password, 
+                           d.status, d.created_at, u.name, b.firm_name, u.phone
+                    FROM trade_deals d
+                    JOIN users u ON u.id = d.farmer_id
+                    JOIN buyer_profiles b ON b.user_id = d.buyer_id
+                    WHERE d.buyer_id = %s
+                    ORDER BY d.created_at DESC
+                """, (user["id"],))
+            
+            rows = cur.fetchall()
+            result = []
+            for row in rows:
+                order = OrderRequest(
+                    id=str(row[0]),
+                    cropId=row[4].lower().replace(' ', '_'),
+                    cropName=row[4],
+                    variety="",
+                    quantityQuintals=float(row[5]),
+                    proposedPricePerQuintal=float(row[6]),
+                    farmerId=str(row[2]),
+                    farmerName=row[14],
+                    farmerPhone=row[16],
+                    farmerLocation=row[8],
+                    farmerDistrict="",
+                    buyerId=str(row[3]),
+                    buyerName="",
+                    buyerCompany=row[15],
+                    targetMarketId="",
+                    targetMarketName=row[9],
+                    status=row[12].lower() if row[12] else "pending",
+                    orderOrigin="farmer_proposal",
+                    moisturePercent=12.0,
+                    expectedLossPercent=2.0,
+                    qualityGrade=row[10],
+                    grossAmount=float(row[7]),
+                    freightCost=0.0,
+                    calculatedNetRealization=float(row[7]),
+                    createdAt=row[13].isoformat() if row[13] else datetime.now(timezone.utc).isoformat()
+                )
+                result.append(order)
+            return result
+    finally:
+        conn.close()
+
+
+@router.get("/real-deals")
+def get_all_real_deals(user=Depends(get_current_user)):
+    """Get all real deals from database (combined view for dashboards)."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT d.id, d.deal_code, d.farmer_id, d.buyer_id, d.crop_name, 
+                       d.agreed_quantity_quintals, d.agreed_price_per_quintal, d.gross_amount,
+                       d.pickup_location, d.delivery_location, d.quality_grade, d.deal_password, 
+                       d.status, d.created_at, f.name, b.firm_name, f.phone
+                FROM trade_deals d
+                JOIN users f ON f.id = d.farmer_id
+                JOIN buyer_profiles b ON b.user_id = d.buyer_id
+                ORDER BY d.created_at DESC
+            """)
+            
+            rows = cur.fetchall()
+            result = []
+            for row in rows:
+                order = OrderRequest(
+                    id=str(row[0]),
+                    cropId=row[4].lower().replace(' ', '_'),
+                    cropName=row[4],
+                    variety="",
+                    quantityQuintals=float(row[5]),
+                    proposedPricePerQuintal=float(row[6]),
+                    farmerId=str(row[2]),
+                    farmerName=row[14],
+                    farmerPhone=row[16],
+                    farmerLocation=row[8],
+                    farmerDistrict="",
+                    buyerId=str(row[3]),
+                    buyerName="",
+                    buyerCompany=row[15],
+                    targetMarketId="",
+                    targetMarketName=row[9],
+                    status=row[12].lower() if row[12] else "pending",
+                    orderOrigin="farmer_proposal",
+                    moisturePercent=12.0,
+                    expectedLossPercent=2.0,
+                    qualityGrade=row[10],
+                    grossAmount=float(row[7]),
+                    freightCost=0.0,
+                    calculatedNetRealization=float(row[7]),
+                    createdAt=row[13].isoformat() if row[13] else datetime.now(timezone.utc).isoformat()
+                )
+                result.append(order)
+            return result
+    finally:
+        conn.close()
