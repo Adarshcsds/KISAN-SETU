@@ -8,6 +8,7 @@ from backend.routers import demands
 from backend.routers import logistics
 from backend.routers import mandis
 from backend.routers import orders
+from backend.routers import payments
 from backend.routers import predictions
 from backend.routers import communities
 
@@ -38,6 +39,7 @@ app.include_router(commodities.router, prefix="/api")
 app.include_router(mandis.router, prefix="/api")
 app.include_router(predictions.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
+app.include_router(payments.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(demands.router, prefix="/api")
 app.include_router(demands.offer_router, prefix="/api")

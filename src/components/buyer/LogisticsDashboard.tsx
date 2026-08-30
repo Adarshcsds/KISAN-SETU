@@ -9,6 +9,7 @@ interface AvailableDeal {
   farmerName: string;
   buyerId: string;
   buyerName: string;
+  buyerOrganizationName?: string;
   cropName: string;
   quantityQuintals: number;
   pickupLocation: string;
@@ -27,6 +28,10 @@ interface AssignedShipment {
   deliveryLocation: string;
   status: string;
   providerName: string;
+  farmerName?: string;
+  buyerName?: string;
+  buyerOrganizationName?: string;
+  freightAmount?: number;
   licensePlate?: string;
   currentLocation?: string;
 }
@@ -41,6 +46,9 @@ export const LogisticsDashboard: React.FC<Props> = ({ token }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [accepting, setAccepting] = useState<string | null>(null);
+  const [freightAmounts, setFreightAmounts] = useState<Record<string, string>>({});
+  const [vehicleFor, setVehicleFor] = useState<AssignedShipment | null>(null);
+  const [vehicle, setVehicle] = useState({ vehicleNumber: '', vehicleType: '', driverName: '', driverPhone: '', currentLocation: '', loadingDate: '', loadingTime: '', eta: '' });
   const [activeTab, setActiveTab] = useState<'available' | 'assigned'>('available');
 
   useEffect(() => {
@@ -67,14 +75,32 @@ export const LogisticsDashboard: React.FC<Props> = ({ token }) => {
 
   const handleAcceptDeal = async (dealId: string) => {
     try {
+      const freightAmount = Number(freightAmounts[dealId]);
+      if (!Number.isFinite(freightAmount) || freightAmount <= 0) {
+        setError('Enter a valid freight amount before submitting the transport offer.');
+        return;
+      }
       setAccepting(dealId);
-      await KisanSetuApi.acceptLogisticsShipment(token, dealId);
+      await KisanSetuApi.acceptLogisticsShipment(token, dealId, freightAmount);
       await loadData();
     } catch (err) {
       console.error('Failed to accept deal:', err);
       setError('Failed to accept deal');
     } finally {
       setAccepting(null);
+    }
+  };
+
+  const assignVehicle = async () => {
+    if (!vehicleFor) return;
+    try {
+      await KisanSetuApi.assignVehicle(token, vehicleFor.tradeDealId, vehicle);
+      setVehicleFor(null);
+      setVehicle({ vehicleNumber: '', vehicleType: '', driverName: '', driverPhone: '', currentLocation: '', loadingDate: '', loadingTime: '', eta: '' });
+      await loadData();
+    } catch (err) {
+      console.error('Failed to assign vehicle:', err);
+      setError('Could not assign the vehicle. Check all schedule details and try again.');
     }
   };
 
@@ -178,6 +204,7 @@ export const LogisticsDashboard: React.FC<Props> = ({ token }) => {
                   <div className="bg-[#F9FAFB] rounded-lg p-3">
                     <div className="text-[10px] text-[#6B7280] font-semibold mb-1">Buyer</div>
                     <div className="text-sm font-bold text-[#1F2937]">{deal.buyerName}</div>
+                    {deal.buyerOrganizationName && <div className="text-xs text-[#6B7280] mt-1">{deal.buyerOrganizationName}</div>}
                   </div>
                   <div className="bg-[#F9FAFB] rounded-lg p-3 sm:col-span-2">
                     <div className="text-[10px] text-[#6B7280] font-semibold mb-1">Route</div>
@@ -191,6 +218,7 @@ export const LogisticsDashboard: React.FC<Props> = ({ token }) => {
 
                 {/* Accept Button */}
                 <div className="flex gap-3 pt-2">
+                  <input type="number" min="1" placeholder="Freight amount (₹)" value={freightAmounts[deal.tradeDealId] || ''} onChange={(e) => setFreightAmounts({ ...freightAmounts, [deal.tradeDealId]: e.target.value })} className="w-44 rounded-lg border border-[#D1D5DB] px-3 text-sm" />
                   <button
                     onClick={() => handleAcceptDeal(deal.tradeDealId)}
                     disabled={accepting === deal.tradeDealId}
@@ -244,6 +272,15 @@ export const LogisticsDashboard: React.FC<Props> = ({ token }) => {
 
                 {/* Details Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="bg-[#F9FAFB] rounded-lg p-3">
+                    <div className="text-[10px] text-[#6B7280] font-semibold mb-1">Farmer</div>
+                    <div className="text-sm font-bold text-[#1F2937]">{shipment.farmerName || '—'}</div>
+                  </div>
+                  <div className="bg-[#F9FAFB] rounded-lg p-3">
+                    <div className="text-[10px] text-[#6B7280] font-semibold mb-1">Buyer</div>
+                    <div className="text-sm font-bold text-[#1F2937]">{shipment.buyerName || '—'}</div>
+                    {shipment.buyerOrganizationName && <div className="text-xs text-[#6B7280] mt-1">{shipment.buyerOrganizationName}</div>}
+                  </div>
                   <div className="bg-[#F9FAFB] rounded-lg p-3 sm:col-span-2">
                     <div className="text-[10px] text-[#6B7280] font-semibold mb-1">Route</div>
                     <div className="flex items-center space-x-2 text-sm text-[#1F2937]">
@@ -271,11 +308,16 @@ export const LogisticsDashboard: React.FC<Props> = ({ token }) => {
                     )}
                   </div>
                 )}
+                {shipment.freightAmount != null && <div className="text-sm font-bold text-[#15803D]">Freight: ₹{shipment.freightAmount.toLocaleString('en-IN')}</div>}
+                {shipment.status === 'LOGISTICS_CONFIRMED' && (
+                  <button onClick={() => setVehicleFor(shipment)} className="w-full px-4 py-2.5 rounded-lg bg-[#1D4ED8] text-white font-bold text-sm">Assign Vehicle</button>
+                )}
               </div>
             ))
           )}
         </div>
       )}
+      {vehicleFor && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"><div className="clean-card w-full max-w-xl p-6 space-y-4 bg-white"><div><h3 className="text-lg font-bold">Assign Vehicle — {vehicleFor.dealCode}</h3><p className="text-xs text-[#6B7280]">Buyer Approved. Enter the loading schedule for farmer and buyer tracking.</p></div><div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{([['vehicleNumber','Vehicle number'],['vehicleType','Vehicle type'],['driverName','Driver name'],['driverPhone','Driver phone'],['currentLocation','Current location'],['eta','ETA']] as const).map(([key,label]) => <input key={key} placeholder={label} value={vehicle[key]} onChange={(e) => setVehicle({ ...vehicle, [key]: e.target.value })} className="rounded-lg border border-[#D1D5DB] px-3 py-2 text-sm" />)}<input type="date" value={vehicle.loadingDate} onChange={(e) => setVehicle({ ...vehicle, loadingDate: e.target.value })} className="rounded-lg border border-[#D1D5DB] px-3 py-2 text-sm" /><input type="time" value={vehicle.loadingTime} onChange={(e) => setVehicle({ ...vehicle, loadingTime: e.target.value })} className="rounded-lg border border-[#D1D5DB] px-3 py-2 text-sm" /></div><div className="flex gap-3"><button onClick={() => setVehicleFor(null)} className="flex-1 rounded-lg border px-4 py-2 font-bold text-sm">Cancel</button><button onClick={assignVehicle} className="flex-1 rounded-lg bg-[#1D4ED8] text-white px-4 py-2 font-bold text-sm">Save vehicle</button></div></div></div>}
     </div>
   );
 };

@@ -156,6 +156,7 @@ def initialize_auth_schema():
                     driver_name VARCHAR(120), driver_phone VARCHAR(20), distance_km NUMERIC(10,2),
                     freight_amount NUMERIC(14,2), gate_pass_id VARCHAR(40) UNIQUE,
                     current_location VARCHAR(200), eta_text VARCHAR(80),
+                    loading_date DATE, loading_time TIME,
                     status VARCHAR(30) NOT NULL DEFAULT 'AVAILABLE'
                         CHECK (status IN ('AVAILABLE','ACCEPTED','WAITING_BUYER_APPROVAL','LOGISTICS_CONFIRMED','VEHICLE_ASSIGNED','DISPATCHED','IN_TRANSIT','DELIVERED','COMPLETED')),
                     freight_payment_status VARCHAR(20) DEFAULT 'PENDING' 
@@ -167,10 +168,29 @@ def initialize_auth_schema():
             cur.execute("ALTER TABLE logistics_shipments ADD COLUMN IF NOT EXISTS freight_payment_status VARCHAR(20) DEFAULT 'PENDING' CHECK (freight_payment_status IN ('PENDING','REQUESTED','APPROVED','REJECTED','PAID'))")
             cur.execute("ALTER TABLE logistics_shipments ADD COLUMN IF NOT EXISTS current_location VARCHAR(200)")
             cur.execute("ALTER TABLE logistics_shipments ADD COLUMN IF NOT EXISTS eta_text VARCHAR(80)")
+            cur.execute("ALTER TABLE logistics_shipments ADD COLUMN IF NOT EXISTS loading_date DATE")
+            cur.execute("ALTER TABLE logistics_shipments ADD COLUMN IF NOT EXISTS loading_time TIME")
             cur.execute("ALTER TABLE logistics_shipments DROP CONSTRAINT IF EXISTS logistics_shipments_status_check")
-            cur.execute("ALTER TABLE logistics_shipments ADD CONSTRAINT logistics_shipments_status_check CHECK (status IN ('AVAILABLE','ACCEPTED','WAITING_BUYER_APPROVAL','LOGISTICS_CONFIRMED','VEHICLE_ASSIGNED','DISPATCHED','IN_TRANSIT','DELIVERED','COMPLETED'))")
+            cur.execute("ALTER TABLE logistics_shipments ADD CONSTRAINT logistics_shipments_status_check CHECK (status IN ('AVAILABLE','ACCEPTED','WAITING_BUYER_APPROVAL','LOGISTICS_CONFIRMED','VEHICLE_ASSIGNED','DISPATCHED','IN_TRANSIT','DELIVERED','COMPLETED','REJECTED'))")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_logistics_shipments_provider ON logistics_shipments(provider_id, status)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_logistics_shipments_status ON logistics_shipments(status)")
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS deal_payments (
+                    id UUID PRIMARY KEY,
+                    trade_deal_id UUID NOT NULL UNIQUE REFERENCES trade_deals(id) ON DELETE CASCADE,
+                    buyer_id UUID NOT NULL REFERENCES users(id),
+                    farmer_id UUID NOT NULL REFERENCES users(id),
+                    amount NUMERIC(14,2) NOT NULL CHECK (amount > 0),
+                    status VARCHAR(20) NOT NULL CHECK (status IN ('PENDING','LOCKED','RELEASED','REFUNDED','FAILED')),
+                    transaction_reference VARCHAR(40) NOT NULL UNIQUE,
+                    release_reference VARCHAR(40) UNIQUE,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    released_at TIMESTAMPTZ
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_deal_payments_buyer ON deal_payments(buyer_id, status)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_deal_payments_farmer ON deal_payments(farmer_id, status)")
             
             # Community Tables
             cur.execute("""

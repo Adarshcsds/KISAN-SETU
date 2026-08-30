@@ -7,6 +7,7 @@ interface ShipmentApproval {
   tradeDealId: string;
   dealCode: string;
   farmerId: string;
+  farmerName?: string;
   buyerId: string;
   cropName: string;
   quantityQuintals: number;
@@ -15,6 +16,8 @@ interface ShipmentApproval {
   status: string;
   providerId: string;
   providerName: string;
+  buyerOrganizationName?: string;
+  freightAmount?: number;
   createdAt: string;
 }
 
@@ -49,10 +52,10 @@ export const TransportApprovalSection: React.FC<Props> = ({ token }) => {
     }
   };
 
-  const handleApprove = async (dealId: string) => {
+  const handleApprove = async (dealId: string, shipmentId: string) => {
     try {
       setApproving(dealId);
-      await KisanSetuApi.approveLogisticsProvider(token, dealId);
+     await KisanSetuApi.approveLogisticsProvider(token, dealId, shipmentId);
       await loadShipments();
     } catch (err) {
       console.error('Failed to approve logistics provider:', err);
@@ -129,7 +132,7 @@ export const TransportApprovalSection: React.FC<Props> = ({ token }) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-[#F9FAFB] rounded-lg p-3">
               <div className="text-[10px] text-[#6B7280] font-semibold mb-1">Farmer</div>
-              <div className="text-sm font-bold text-[#1F2937]">{shipment.farmerId}</div>
+              <div className="text-sm font-bold text-[#1F2937]">{shipment.farmerName || 'Unknown farmer'}</div>
             </div>
             <div className="bg-[#F9FAFB] rounded-lg p-3">
               <div className="text-[10px] text-[#6B7280] font-semibold mb-1">Transporter</div>
@@ -143,12 +146,16 @@ export const TransportApprovalSection: React.FC<Props> = ({ token }) => {
               <div className="text-[10px] text-[#6B7280] font-semibold mb-1">Delivery Location</div>
               <div className="text-sm font-bold text-[#1F2937]">{shipment.deliveryLocation}</div>
             </div>
+            <div className="bg-[#F0FDF4] rounded-lg p-3 sm:col-span-2">
+              <div className="text-[10px] text-[#6B7280] font-semibold mb-1">Freight amount</div>
+              <div className="text-sm font-bold text-[#15803D]">₹{shipment.freightAmount?.toLocaleString('en-IN') || 'Not provided'}</div>
+            </div>
           </div>
 
           {/* Actions */}
           <div className="flex gap-3 pt-2">
             <button
-              onClick={() => handleApprove(shipment.tradeDealId)}
+              onClick={() => handleApprove(shipment.tradeDealId, shipment.id)}
               disabled={approving === shipment.tradeDealId}
               className="flex-1 px-4 py-2.5 rounded-lg bg-[#15803D] hover:bg-[#166534] text-white font-bold text-sm transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
             >

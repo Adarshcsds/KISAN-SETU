@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { KisanSetuApi } from '../../services/api';
 import { Store, Building2, ShieldCheck, CheckCircle2, XCircle, ArrowRight, Clock, Plus, RefreshCw } from 'lucide-react';
+import { FarmerShipmentTracking } from './FarmerShipmentTracking';
 
 const token = () => localStorage.getItem('kisansetu_access_token') || '';
 
@@ -255,9 +256,14 @@ export const DemandMarketplace: React.FC = () => {
               ))}
             </div>
           )}
-        </div>
+                </div>
+
+        {/* Logistics Tracking - shown only after a logistics provider is assigned */}
+        <FarmerShipmentTracking token={token()} />
 
       </div>
+
+      {/* Offer Modal */}
 
       {/* Offer Modal */}
       {activeOfferDemand && (

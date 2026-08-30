@@ -4,6 +4,8 @@ import { KisanSetuApi } from '../../services/api';
 
 interface Shipment {
   id: string;
+  buyerName?: string;
+  buyerOrganizationName?: string;
   tradeDealId: string;
   dealCode: string;
   buyerId: string;
@@ -15,7 +17,11 @@ interface Shipment {
   providerId: string;
   providerName: string;
   licensePlate: string;
+  driverName?: string;
+  driverPhone?: string;
   currentLocation: string;
+  loadingDate?: string;
+  loadingTime?: string;
   etaText: string;
   updatedAt: string;
 }
@@ -26,6 +32,7 @@ interface Props {
 
 export const FarmerShipmentTracking: React.FC<Props> = ({ token }) => {
   const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [payments, setPayments] = useState<Record<string, { amount: number; status: string }>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,8 +45,9 @@ export const FarmerShipmentTracking: React.FC<Props> = ({ token }) => {
   const loadShipments = async () => {
     try {
       setLoading(true);
-      const data = await KisanSetuApi.getFarmerShipments(token);
+      const [data, paymentData] = await Promise.all([KisanSetuApi.getFarmerShipments(token), KisanSetuApi.getPayments(token)]);
       setShipments(data);
+      setPayments(Object.fromEntries((paymentData || []).map((payment: { tradeDealId: string; amount: number; status: string }) => [payment.tradeDealId, payment])));
       setError(null);
     } catch (err) {
       console.error('Failed to load shipments:', err);
@@ -89,7 +97,7 @@ export const FarmerShipmentTracking: React.FC<Props> = ({ token }) => {
       <div className="clean-card p-6 text-center text-[#6B7280]">
         <Truck className="w-8 h-8 mx-auto text-[#6B7280] opacity-50 mb-2" />
         <p className="text-sm font-medium text-[#1F2937]">No shipments yet</p>
-        <p className="text-xs text-[#6B7280] mt-1">Your shipments will appear here once deals are created</p>
+        <p className="text-xs text-[#6B7280] mt-1">Transportation details will appear here once the buyer confirms a logistics provider.</p>
       </div>
     );
   }
@@ -129,7 +137,10 @@ export const FarmerShipmentTracking: React.FC<Props> = ({ token }) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="bg-[#F9FAFB] rounded-lg p-3">
               <div className="text-[10px] text-[#6B7280] font-semibold mb-1">Buyer</div>
-              <div className="text-sm font-bold text-[#1F2937]">{shipment.buyerId}</div>
+              <div className="text-sm font-bold text-[#1F2937]">
+                {shipment.buyerName || 'Buyer'}
+                {shipment.buyerOrganizationName && <div className="text-xs text-[#6B7280] mt-1">{shipment.buyerOrganizationName}</div>}
+              </div>
             </div>
             <div className="bg-[#F9FAFB] rounded-lg p-3">
               <div className="text-[10px] text-[#6B7280] font-semibold mb-1">Transporter</div>
@@ -144,6 +155,14 @@ export const FarmerShipmentTracking: React.FC<Props> = ({ token }) => {
               <div className="text-sm font-bold text-[#1F2937]">{shipment.deliveryLocation}</div>
             </div>
           </div>
+
+          {/* Vehicle & Tracking Info (if available) */}
+          {payments[shipment.tradeDealId] && (
+            <div className="bg-[#F0FDF4] border border-[#BBFDBF] rounded-lg p-3">
+              <div className="text-[10px] text-[#166534] font-semibold">KisanSetu Escrow</div>
+              <div className="text-sm font-bold text-[#15803D]">₹{payments[shipment.tradeDealId].amount.toLocaleString('en-IN')} · {payments[shipment.tradeDealId].status === 'RELEASED' ? 'Payment Released' : 'Buyer Payment Secured'}</div>
+            </div>
+          )}
 
           {/* Vehicle & Tracking Info (if available) */}
           {(shipment.licensePlate || shipment.currentLocation) && (
@@ -166,6 +185,15 @@ export const FarmerShipmentTracking: React.FC<Props> = ({ token }) => {
                   </div>
                 </div>
               )}
+
+              {(shipment.loadingDate || shipment.loadingTime) && (
+                <div className="flex items-center space-x-3 bg-[#F3F4F6] p-3 rounded-lg border border-[#D1D5DB]">
+                  <Clock className="w-4 h-4 text-[#1F2937] flex-shrink-0" />
+                  <div><div className="text-[10px] text-[#4B5563] font-semibold">Loading schedule</div><div className="text-sm font-bold text-[#1F2937]">{shipment.loadingDate || 'Date pending'} {shipment.loadingTime || ''}</div></div>
+                </div>
+              )}
+
+              {shipment.driverName && <div className="text-sm text-[#1F2937]"><span className="font-semibold">Driver:</span> {shipment.driverName}{shipment.driverPhone ? ` · ${shipment.driverPhone}` : ''}</div>}
 
               {shipment.etaText && (
                 <div className="flex items-center space-x-3 bg-[#FEF3C7] p-3 rounded-lg border border-[#FCD34D]">
