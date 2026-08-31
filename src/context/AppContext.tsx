@@ -23,6 +23,7 @@ import { DEFAULT_USERS } from '../data/mockUsers';
 import { TRANSLATIONS } from '../utils/translations';
 import confetti from 'canvas-confetti';
 import { AuthUserResponse, KisanSetuApi } from '../services/api';
+import { AuthModal } from '../components/auth/AuthModal';
 
 export interface AppNotification {
   id: string;
@@ -117,15 +118,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return saved ? JSON.parse(saved) : DEFAULT_USERS;
   });
 
-  const [currentUser, setCurrentUser] = useState<User>(() => {
-    const saved = localStorage.getItem('kisansetu_current_user');
-    return saved ? JSON.parse(saved) : DEFAULT_USERS[0]; // Default: Rajesh
-  });
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(() => !localStorage.getItem('kisansetu_access_token'));
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register' | 'forgot_password'>('login');
 
-  const [role, setDisplayedRole] = useState<Role>(currentUser.role || 'farmer');
+  const [role, setDisplayedRole] = useState<Role>(currentUser?.role || 'farmer');
   const [language, setLanguage] = useState<Language>('en');
   const [selectedCropId, setSelectedCropId] = useState<string>('wheat');
   const [selectedMandiId, setSelectedMandiId] = useState<string | null>('mandi-pune');
@@ -143,8 +141,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [usersList]);
 
   useEffect(() => {
-    localStorage.setItem('kisansetu_current_user', JSON.stringify(currentUser));
-    setDisplayedRole(currentUser.role);
+    if (currentUser) {
+      localStorage.setItem('kisansetu_current_user', JSON.stringify(currentUser));
+      setDisplayedRole(currentUser.role);
+    } else {
+      localStorage.removeItem('kisansetu_current_user');
+    }
   }, [currentUser]);
 
   const toUser = (user: AuthUserResponse): User => {
@@ -180,14 +182,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // UI role changes cannot alter an authenticated account's backend role.
   const setRole = (nextRole: Role) => {
-    if (nextRole === currentUser.role) setDisplayedRole(nextRole);
+    if (currentUser && nextRole === currentUser.role) setDisplayedRole(nextRole);
   };
 
   const logoutUser = () => {
     localStorage.removeItem('kisansetu_access_token');
     localStorage.removeItem('kisansetu_current_user');
-    setCurrentUser(DEFAULT_USERS[0]);
+    setCurrentUser(null);
     setDisplayedRole('farmer');
+    setAuthModalMode('login');
+    setIsAuthModalOpen(true);
   };
 
   useEffect(() => {
@@ -195,7 +199,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!token) return;
     KisanSetuApi.me(token)
       .then(user => setCurrentUser(toUser(user)))
-      .catch(() => localStorage.removeItem('kisansetu_access_token'));
+      .catch(() => {
+        localStorage.removeItem('kisansetu_access_token');
+        setCurrentUser(null);
+        setAuthModalMode('login');
+        setIsAuthModalOpen(true);
+      });
   }, []);
 
   const [notifications, setNotifications] = useState<AppNotification[]>([
@@ -641,7 +650,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   return (
     <AppContext.Provider
       value={{
-        currentUser,
+        currentUser: currentUser as User,
         usersList,
         loginUser,
         registerUser,
@@ -690,7 +699,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         buyerEscrowLocked,
       }}
     >
-      {children}
+      {currentUser ? children : <AuthModal />}
     </AppContext.Provider>
   );
 };
