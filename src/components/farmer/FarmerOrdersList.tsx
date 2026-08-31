@@ -4,6 +4,7 @@ import { OrderRequest } from '../../types';
 import { VehicleDispatchModal } from './VehicleDispatchModal';
 import { PaymentReceiptModal } from './PaymentReceiptModal';
 import { OrderSupportActions } from '../support/SupportModule';
+import { FarmerPaymentSummary } from '../payments/FarmerPaymentSummary';
 import { 
   Package, 
   Truck, 
@@ -92,6 +93,7 @@ export const FarmerOrdersList: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <FarmerPaymentSummary />
       
       {/* Header & Filter Pills */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

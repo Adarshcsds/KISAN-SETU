@@ -32,6 +32,8 @@ interface AssignedShipment {
   buyerName?: string;
   buyerOrganizationName?: string;
   freightAmount?: number;
+  freightPaymentStatus?: string;
+  freightPaymentReference?: string;
   licensePlate?: string;
   currentLocation?: string;
 }
@@ -309,6 +311,7 @@ export const LogisticsDashboard: React.FC<Props> = ({ token }) => {
                   </div>
                 )}
                 {shipment.freightAmount != null && <div className="text-sm font-bold text-[#15803D]">Freight: ₹{shipment.freightAmount.toLocaleString('en-IN')}</div>}
+                {shipment.freightAmount != null && <div className={`text-xs font-bold ${shipment.freightPaymentStatus === 'PAID' ? 'text-[#15803D]' : 'text-[#B45309]'}`}>Payment: {shipment.freightPaymentStatus === 'PAID' ? 'PAYMENT RECEIVED' : shipment.freightPaymentStatus || 'PENDING'} {shipment.freightPaymentReference ? `· ${shipment.freightPaymentReference}` : ''}</div>}
                 {shipment.status === 'LOGISTICS_CONFIRMED' && (
                   <button onClick={() => setVehicleFor(shipment)} className="w-full px-4 py-2.5 rounded-lg bg-[#1D4ED8] text-white font-bold text-sm">Assign Vehicle</button>
                 )}

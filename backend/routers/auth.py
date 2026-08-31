@@ -29,8 +29,8 @@ class LoginRequest(BaseModel):
 def find_user(cur, identifier: str):
     cur.execute(
         "SELECT id, name, phone, email, role, created_at, is_active, profile, password_hash "
-        "FROM users WHERE phone = %s OR lower(email) = lower(%s)",
-        (identifier, identifier),
+        "FROM users WHERE phone = %s OR lower(email) = lower(%s) OR lower(name) = lower(%s)",
+        (identifier, identifier, identifier),
     )
     return cur.fetchone()
 

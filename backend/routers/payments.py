@@ -29,8 +29,12 @@ def list_payments(user=Depends(require_roles("buyer", "farmer"))):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            owner = "p.buyer_id" if user["role"] == "buyer" else "p.farmer_id"
-            cur.execute(PAYMENT_SELECT + f" WHERE {owner}=%s ORDER BY p.updated_at DESC", (user["id"],))
+            owner = "d.buyer_id" if user["role"] == "buyer" else "d.farmer_id"
+            cur.execute("""SELECT p.id,d.id,d.deal_code,d.crop_name,d.agreed_quantity_quintals,
+                           COALESCE(p.amount,d.gross_amount),COALESCE(p.status,'PENDING'),p.transaction_reference,p.release_reference,
+                           COALESCE(p.created_at,d.created_at),COALESCE(p.released_at,NULL)
+                           FROM trade_deals d LEFT JOIN deal_payments p ON p.trade_deal_id=d.id
+                           WHERE """ + owner + "=%s ORDER BY COALESCE(p.updated_at,d.created_at) DESC", (user["id"],))
             return [_payment(row) for row in cur.fetchall()]
     finally:
         conn.close()
@@ -64,6 +68,31 @@ def secure_payment(deal_id: str, user=Depends(require_roles("buyer"))):
     except Exception:
         conn.rollback()
         raise
+    finally:
+        conn.close()
+
+
+@router.post("/{deal_id}/pay")
+def pay_now(deal_id: str, user=Depends(require_roles("buyer"))):
+    """Complete a server-recorded demo payment for the buyer's own trade."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id,buyer_id,farmer_id,gross_amount FROM trade_deals WHERE id=%s AND buyer_id=%s FOR UPDATE", (deal_id, user["id"]))
+            deal = cur.fetchone()
+            if not deal: raise HTTPException(404, "Trade deal not found for this buyer")
+            cur.execute("SELECT id,status FROM deal_payments WHERE trade_deal_id=%s FOR UPDATE", (deal_id,))
+            existing = cur.fetchone(); reference = f"KS-PAY-{secrets.token_hex(4).upper()}"
+            if existing and existing[1] == "RELEASED": raise HTTPException(409, "Payment has already been completed")
+            if existing:
+                cur.execute("UPDATE deal_payments SET status='RELEASED',release_reference=%s,released_at=NOW(),updated_at=NOW() WHERE id=%s", (reference, existing[0]))
+            else:
+                cur.execute("""INSERT INTO deal_payments (id,trade_deal_id,buyer_id,farmer_id,amount,status,transaction_reference,release_reference,released_at)
+                               VALUES (%s,%s,%s,%s,%s,'RELEASED',%s,%s,NOW())""", (str(uuid.uuid4()), deal_id, deal[1], deal[2], deal[3], reference, reference))
+            cur.execute(PAYMENT_SELECT + " WHERE p.trade_deal_id=%s", (deal_id,)); row = cur.fetchone()
+        conn.commit(); return _payment(row)
+    except Exception:
+        conn.rollback(); raise
     finally:
         conn.close()
 

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { KisanSetuApi } from '../../services/api';
 import { Store, Building2, ShieldCheck, CheckCircle2, XCircle, ArrowRight, Clock, Plus, RefreshCw } from 'lucide-react';
 import { FarmerShipmentTracking } from './FarmerShipmentTracking';
+import { NegotiationPanel } from '../negotiation/NegotiationPanel';
 
 const token = () => localStorage.getItem('kisansetu_access_token') || '';
 
@@ -204,28 +205,7 @@ export const DemandMarketplace: React.FC = () => {
                     </span>
                   </div>
 
-                  {o.status === 'COUNTERED' && (
-                    <div className="flex items-center space-x-2 pt-1">
-                      <button
-                        onClick={() => respond(o, 'accept')}
-                        className="px-2.5 py-1 rounded-lg bg-[#2E7D32] text-white text-[11px] font-bold"
-                      >
-                        Accept
-                      </button>
-                      <button
-                        onClick={() => respond(o, 'counter')}
-                        className="px-2.5 py-1 rounded-lg bg-white border border-[#D1D5DB] text-[#1F2937] text-[11px] font-bold"
-                      >
-                        Counter
-                      </button>
-                      <button
-                        onClick={() => respond(o, 'reject')}
-                        className="px-2.5 py-1 rounded-lg bg-[#FEE2E2] text-[#B91C1C] text-[11px] font-bold"
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  )}
+                  {(o.status === 'PENDING' || o.status === 'COUNTERED') && <NegotiationPanel offer={o} role="farmer" onChanged={load} />}
                 </div>
               ))}
             </div>
@@ -333,4 +313,3 @@ export const DemandMarketplace: React.FC = () => {
     </div>
   );
 };
-

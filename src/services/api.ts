@@ -11,7 +11,7 @@ export interface AuthUserResponse {
   name: string;
   phone: string;
   email?: string;
-  role: 'farmer' | 'buyer' | 'logistics';
+  role: 'farmer' | 'buyer' | 'logistics' | 'admin';
   profile: Record<string, unknown>;
 }
 
@@ -68,7 +68,15 @@ export const KisanSetuApi = {
   createDemandOffer: (token: string, demandId: string, payload: unknown) => protectedRequest(`/demands/${demandId}/offers`, token, { method: 'POST', body: JSON.stringify(payload) }),
   getMyOffers: (token: string) => protectedRequest('/offers', token),
   respondToOffer: (token: string, offerId: string, action: 'accept' | 'reject' | 'counter', payload?: unknown) => protectedRequest(`/offers/${offerId}/${action}`, token, { method: 'POST', body: payload ? JSON.stringify(payload) : undefined }),
+  getNegotiationHistory: (token: string, offerId: string) => protectedRequest(`/offers/${offerId}/negotiation-history`, token),
   getDeals: (token: string) => protectedRequest('/demands/deals', token),
+  getAdminDashboard: (token: string) => protectedRequest('/admin/dashboard', token),
+  getAdminMarketPrices: (token: string) => protectedRequest('/admin/market-prices', token),
+  getAdminIssues: (token: string) => protectedRequest('/admin/issues', token),
+  getAdminFeedback: (token: string) => protectedRequest('/admin/feedback', token),
+  getAdminSupport: (token: string) => protectedRequest('/admin/support', token),
+  getAdminFeedbackPerformance: (token: string) => protectedRequest('/admin/feedback-performance', token),
+  getAdminRecentActivity: (token: string) => protectedRequest('/admin/recent-activity', token),
   chat: (message: string): Promise<ChatResponse> => {
     const token = localStorage.getItem('kisansetu_access_token') || '';
     return protectedRequest('/chat', token, { method: 'POST', body: JSON.stringify({ message }) });
@@ -240,6 +248,7 @@ export const KisanSetuApi = {
   getPayments: (token: string) => protectedRequest('/payments', token),
   securePayment: (token: string, dealId: string) => protectedRequest(`/payments/${dealId}/secure`, token, { method: 'POST' }),
   releasePayment: (token: string, dealId: string) => protectedRequest(`/payments/${dealId}/release`, token, { method: 'POST' }),
+  payDealNow: (token: string, dealId: string) => protectedRequest(`/payments/${dealId}/pay`, token, { method: 'POST' }),
 
   // Authenticated issue, feedback, and support requests.
   getSupportTickets: (token: string): Promise<SupportTicket[]> => protectedRequest('/support/tickets', token),
@@ -253,6 +262,7 @@ export const KisanSetuApi = {
   requestFreightPayment: (token: string, dealId: string) => protectedRequest(`/logistics/shipments/${dealId}/request-freight-payment`, token, { method: 'POST' }),
   approveFreightPayment: (token: string, dealId: string) => protectedRequest(`/logistics/shipments/${dealId}/approve-freight-payment`, token, { method: 'POST' }),
   rejectFreightPayment: (token: string, dealId: string) => protectedRequest(`/logistics/shipments/${dealId}/reject-freight-payment`, token, { method: 'POST' }),
+  payFreight: (token: string, dealId: string) => protectedRequest(`/logistics/shipments/${dealId}/pay-freight`, token, { method: 'POST' }),
 
   // Communities
   createCommunity: (token: string, payload: unknown) => protectedRequest('/communities', token, { method: 'POST', body: JSON.stringify(payload) }),

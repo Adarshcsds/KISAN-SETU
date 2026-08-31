@@ -85,6 +85,8 @@ def _shipment(row):
         "loadingTime": row[27].isoformat() if row[27] else None,
         "buyerOrganizationName": row[28],
         "providerOrganizationName": row[29],
+        "freightPaymentStatus": row[30],
+        "freightPaymentReference": row[31],
         "createdAt": row[20].isoformat(),
         "updatedAt": row[21].isoformat(),
         "dispatchedAt": row[22].isoformat() if row[22] else None,
@@ -96,7 +98,7 @@ SHIPMENT_SELECT = """SELECT s.id,s.trade_deal_id,d.deal_code,d.farmer_id,d.buyer
  d.agreed_quantity_quintals,d.pickup_location,d.delivery_location,d.quality_grade,s.provider_id,
  s.transporter_name,s.truck_type,s.license_plate,s.driver_name,s.driver_phone,s.distance_km,
  s.freight_amount,s.gate_pass_id,s.status,s.created_at,s.updated_at,s.dispatched_at,s.delivered_at,
- s.current_location,s.eta_text,s.loading_date,s.loading_time,bp.firm_name,lp.firm_name
+ s.current_location,s.eta_text,s.loading_date,s.loading_time,bp.firm_name,lp.firm_name,s.freight_payment_status,s.freight_payment_reference
  FROM logistics_shipments s JOIN trade_deals d ON d.id=s.trade_deal_id
  LEFT JOIN buyer_profiles bp ON bp.user_id=d.buyer_id
  LEFT JOIN logistics_profiles lp ON lp.user_id=s.provider_id"""
@@ -705,5 +707,26 @@ def reject_freight_payment(deal_id: str, user=Depends(require_roles("buyer"))):
     except Exception:
         conn.rollback()
         raise
+    finally:
+        conn.close()
+
+
+@router.post("/shipments/{deal_id}/pay-freight")
+def pay_freight(deal_id: str, user=Depends(require_roles("buyer"))):
+    """Record a buyer-authorized simulated payment to the assigned logistics provider."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT s.id,s.freight_amount FROM logistics_shipments s JOIN trade_deals d ON d.id=s.trade_deal_id
+                           WHERE s.trade_deal_id=%s AND d.buyer_id=%s AND s.provider_id IS NOT NULL FOR UPDATE""", (deal_id, user["id"]))
+            shipment = cur.fetchone()
+            if not shipment: raise HTTPException(404, "Assigned shipment not found for this buyer")
+            if not shipment[1] or shipment[1] <= 0: raise HTTPException(409, "Shipment freight amount is unavailable")
+            cur.execute("""UPDATE logistics_shipments SET freight_payment_status='PAID',freight_payment_reference=%s,updated_at=NOW()
+                           WHERE id=%s""", (f"KS-LOG-{secrets.token_hex(4).upper()}", shipment[0]))
+            cur.execute(SHIPMENT_SELECT + " WHERE s.id=%s", (shipment[0],)); row = cur.fetchone()
+        conn.commit(); return _shipment(row)
+    except Exception:
+        conn.rollback(); raise
     finally:
         conn.close()

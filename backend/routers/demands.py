@@ -57,6 +57,15 @@ def _offer(row):
             "updatedAt": row[9].isoformat(), "farmerName": row[10], "farmerLocation": row[11]}
 
 
+def _negotiation_history(cur, offer_id):
+    cur.execute("""SELECT h.id,h.offered_by_user_id,h.offered_price,h.round_number,h.created_at,u.name,u.role
+                   FROM offer_negotiations h JOIN users u ON u.id=h.offered_by_user_id
+                   WHERE h.offer_id=%s ORDER BY h.round_number""", (offer_id,))
+    return [{"id": str(row[0]), "offeredByUserId": str(row[1]), "offeredPrice": float(row[2]),
+             "roundNumber": row[3], "createdAt": row[4].isoformat(), "offeredByName": row[5], "offeredByRole": row[6]}
+            for row in cur.fetchall()]
+
+
 DEMAND_SELECT = """SELECT d.id,d.buyer_id,d.crop_name,d.crop_category,d.quantity_quintals,d.offered_price_per_quintal,
  d.quality_grade,d.delivery_location,d.deadline,d.notes,d.status,d.created_at,b.firm_name
  FROM buyer_demands d JOIN buyer_profiles b ON b.user_id=d.buyer_id"""
@@ -196,6 +205,8 @@ def create_offer(demand_id: str, body: OfferCreate, user=Depends(require_roles("
             if Decimal(str(body.offeredQuantityQuintals)) > demand[0]: raise HTTPException(422, "Offer quantity exceeds demand quantity")
             cur.execute("""INSERT INTO demand_offers (id,demand_id,farmer_id,offered_quantity_quintals,offered_price_per_quintal,quality_grade,message)
                 VALUES (%s,%s,%s,%s,%s,%s,%s)""", (str(offer_id := uuid.uuid4()), demand_id, user["id"], body.offeredQuantityQuintals, body.offeredPricePerQuintal, body.qualityGrade.strip(), body.message))
+            cur.execute("""INSERT INTO offer_negotiations (id,offer_id,offered_by_user_id,offered_price,round_number)
+                           VALUES (%s,%s,%s,%s,1)""", (str(uuid.uuid4()), str(offer_id), user["id"], body.offeredPricePerQuintal))
             cur.execute(OFFER_SELECT + " WHERE o.id=%s", (str(offer_id),)); row = cur.fetchone()
         conn.commit(); return _offer(row)
     finally: conn.close()
@@ -231,6 +242,24 @@ def _load_offer_for_update(cur, offer_id):
     row = cur.fetchone()
     if not row: raise HTTPException(404, "Offer not found")
     return row
+
+
+@offer_router.get("/{offer_id}/negotiation-history")
+def negotiation_history(offer_id: str, user=Depends(require_roles("farmer", "buyer"))):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            offer = _load_offer_for_update(cur, offer_id)
+            if str(user["id"]) not in (str(offer[2]), str(offer[7])):
+                raise HTTPException(403, "This negotiation belongs to another user")
+            history = _negotiation_history(cur, offer_id)
+            farmer_offers = sum(item["offeredByRole"] == "farmer" for item in history)
+            buyer_offers = sum(item["offeredByRole"] == "buyer" for item in history)
+            return {"offerId": offer_id, "history": history, "currentPrice": float(offer[4]),
+                    "status": offer[6], "farmerOffers": farmer_offers, "buyerOffers": buyer_offers,
+                    "latestOfferBy": history[-1]["offeredByRole"] if history else None}
+    finally:
+        conn.close()
 
 
 def _create_deal(cur, offer):
@@ -346,8 +375,14 @@ def counter_offer(offer_id: str, body: CounterCreate, user=Depends(require_roles
             buyer_turn = user["role"] == "buyer" and str(offer[7]) == user["id"] and offer[6] == "PENDING"
             farmer_turn = user["role"] == "farmer" and str(offer[2]) == user["id"] and offer[6] == "COUNTERED"
             if not (buyer_turn or farmer_turn): raise HTTPException(409, "This offer cannot be countered by the current user")
+            cur.execute("SELECT COUNT(*) FROM offer_negotiations WHERE offer_id=%s AND offered_by_user_id=%s", (offer_id, user["id"]))
+            if cur.fetchone()[0] >= 2:
+                raise HTTPException(409, f"Maximum {user['role']} negotiation rounds reached.")
             cur.execute("UPDATE demand_offers SET offered_quantity_quintals=%s,offered_price_per_quintal=%s,quality_grade=%s,message=%s,status=%s,updated_at=NOW() WHERE id=%s",
                 (body.offeredQuantityQuintals, body.offeredPricePerQuintal, body.qualityGrade.strip(), body.message, "COUNTERED" if buyer_turn else "PENDING", offer_id))
+            cur.execute("""INSERT INTO offer_negotiations (id,offer_id,offered_by_user_id,offered_price,round_number)
+                           VALUES (%s,%s,%s,%s,(SELECT COUNT(*) + 1 FROM offer_negotiations n WHERE n.offer_id=%s))""",
+                        (str(uuid.uuid4()), offer_id, user["id"], body.offeredPricePerQuintal, offer_id))
         conn.commit(); return {"offerId": offer_id, "status": "COUNTERED" if buyer_turn else "PENDING"}
     except Exception:
         conn.rollback(); raise
