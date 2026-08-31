@@ -11,6 +11,7 @@ import { FpoDashboard } from './components/fpo/FpoDashboard';
 import { AiQualityAssessorModal } from './components/quality/AiQualityAssessorModal';
 import { StorageFinderModal } from './components/farmer/StorageFinderModal';
 import { AuthModal } from './components/auth/AuthModal';
+import { HelpSupport } from './components/support/SupportModule';
 import { 
   LayoutDashboard, 
   Package, 
@@ -108,6 +109,10 @@ export const App: React.FC = () => {
                     <span>{t('warehouse_cold_storage')}</span>
                   </button>
 
+                  <button onClick={() => { setViewingMandiBuyers(null); setActiveTab('support'); }} className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${activeTab === 'support' ? 'bg-[#2E7D32] text-white shadow-sm' : 'text-[#4B5563] hover:bg-[#F3F4F6]'}`}>
+                    <HelpCircle className="w-4 h-4" /><span>Help & Support</span>
+                  </button>
+
                   <button
                     onClick={() => setIsQualityModalOpen(true)}
                     className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-[#15803D] bg-[#DCFCE7] hover:bg-[#BBF7D0] border border-[#86EFAC] transition cursor-pointer touch-target"
@@ -126,6 +131,9 @@ export const App: React.FC = () => {
                   >
                     <LayoutDashboard className="w-4 h-4" />
                     <span>{t('buyer_role')} Dashboard</span>
+                  </button>
+                  <button onClick={() => setActiveTab('support')} className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${activeTab === 'support' ? 'bg-[#2E7D32] text-white shadow-sm' : 'text-[#4B5563] hover:bg-[#F3F4F6]'}`}>
+                    <HelpCircle className="w-4 h-4" /><span>Help & Support</span>
                   </button>
                 </>
               )}
@@ -195,12 +203,13 @@ export const App: React.FC = () => {
                   <FarmerOrdersList />
                 )}
                 {activeTab === 'demands' && <DemandMarketplace />}
+                {activeTab === 'support' && <HelpSupport />}
               </>
             )}
 
             {/* Buyer View */}
             {role === 'buyer' && (
-              <BuyerDashboard />
+              activeTab === 'support' ? <HelpSupport /> : <BuyerDashboard />
             )}
 
             {role === 'logistics' && <LogisticsDashboard token={localStorage.getItem('kisansetu_access_token') || ''} />}

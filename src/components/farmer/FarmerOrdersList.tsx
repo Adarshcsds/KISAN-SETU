@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { OrderRequest } from '../../types';
 import { VehicleDispatchModal } from './VehicleDispatchModal';
 import { PaymentReceiptModal } from './PaymentReceiptModal';
+import { OrderSupportActions } from '../support/SupportModule';
 import { 
   Package, 
   Truck, 
@@ -312,6 +313,8 @@ export const FarmerOrdersList: React.FC = () => {
                   </button>
                 </div>
               )}
+
+              <OrderSupportActions tradeDealId={order.id} />
 
             </div>
           ))

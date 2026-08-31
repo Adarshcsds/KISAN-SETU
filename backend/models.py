@@ -2,6 +2,20 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
 from datetime import datetime
 
+class SupportTicketCreate(BaseModel):
+    issue_type: str = Field(min_length=1, max_length=80)
+    description: str = Field(min_length=1, max_length=4000)
+
+class TradeIssueCreate(BaseModel):
+    trade_deal_id: str
+    issue_type: str = Field(min_length=1, max_length=80)
+    description: str = Field(min_length=1, max_length=4000)
+
+class TradeFeedbackCreate(BaseModel):
+    trade_deal_id: str
+    rating: int = Field(ge=1, le=5)
+    comment: Optional[str] = Field(default=None, max_length=4000)
+
 class Commodity(BaseModel):
     id: str
     name: str

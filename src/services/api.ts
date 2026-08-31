@@ -54,6 +54,10 @@ export interface ChatResponse {
   | 'UNKNOWN';
 }
 
+export interface SupportTicket { id: string; issueType: string; description: string; status: string; createdAt: string; updatedAt: string; }
+export interface TradeIssue extends SupportTicket { tradeDealId: string; dealCode: string; }
+export interface TradeFeedback { id: string; tradeDealId: string; dealCode: string; reviewerUserId: string; revieweeUserId: string; rating: number; comment?: string; createdAt: string; updatedAt: string; }
+
 export const KisanSetuApi = {
   register: (payload: { name: string; phone: string; email?: string; password: string; role: AuthUserResponse['role']; profile: Record<string, unknown> }) => authRequest('/register', { method: 'POST', body: JSON.stringify(payload) }),
   login: (identifier: string, password: string) => authRequest('/login', { method: 'POST', body: JSON.stringify({ identifier, password }) }),
@@ -236,6 +240,14 @@ export const KisanSetuApi = {
   getPayments: (token: string) => protectedRequest('/payments', token),
   securePayment: (token: string, dealId: string) => protectedRequest(`/payments/${dealId}/secure`, token, { method: 'POST' }),
   releasePayment: (token: string, dealId: string) => protectedRequest(`/payments/${dealId}/release`, token, { method: 'POST' }),
+
+  // Authenticated issue, feedback, and support requests.
+  getSupportTickets: (token: string): Promise<SupportTicket[]> => protectedRequest('/support/tickets', token),
+  createSupportTicket: (token: string, payload: { issue_type: string; description: string }): Promise<SupportTicket> => protectedRequest('/support/tickets', token, { method: 'POST', body: JSON.stringify(payload) }),
+  getTradeIssues: (token: string): Promise<TradeIssue[]> => protectedRequest('/support/issues', token),
+  createTradeIssue: (token: string, payload: { trade_deal_id: string; issue_type: string; description: string }): Promise<TradeIssue> => protectedRequest('/support/issues', token, { method: 'POST', body: JSON.stringify(payload) }),
+  getTradeFeedback: (token: string): Promise<TradeFeedback[]> => protectedRequest('/support/feedback', token),
+  createTradeFeedback: (token: string, payload: { trade_deal_id: string; rating: number; comment?: string }): Promise<TradeFeedback> => protectedRequest('/support/feedback', token, { method: 'POST', body: JSON.stringify(payload) }),
 
   // Transport Payment Flow
   requestFreightPayment: (token: string, dealId: string) => protectedRequest(`/logistics/shipments/${dealId}/request-freight-payment`, token, { method: 'POST' }),
