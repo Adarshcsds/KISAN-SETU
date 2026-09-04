@@ -1,0 +1,61 @@
+Folder PATH listing for volume c
+Volume serial number is 00000232 086F:5A2F
+C:\USERS\ASUS\ONEDRIVE\DESKTOP\KISAN-SETU\KISAN-SETU\BACKEND
+|   auth.py
+|   cleanup_future_market_prices.sql
+|   database.py
+|   data_store.py
+|   distance_service.py
+|   import_historical_data.py
+|   main.py
+|   market_data.py
+|   ml_engine.py
+|   models.py
+|   populate_mandi_locations.py
+|   prepare_ml_data.py
+|   requirements.txt
+|   train_forecast.py
+|   
++---routers
+|   |   auth.py
+|   |   chat.py
+|   |   commodities.py
+|   |   communities.py
+|   |   demands.py
+|   |   farmers.py
+|   |   logistics.py
+|   |   mandis.py
+|   |   orders.py
+|   |   payments.py
+|   |   predictions.py
+|   |   __init__.py
+|   |   
+|   \---__pycache__
+|           auth.cpython-314.pyc
+|           chat.cpython-314.pyc
+|           commodities.cpython-314.pyc
+|           communities.cpython-314.pyc
+|           demands.cpython-314.pyc
+|           farmers.cpython-314.pyc
+|           logistics.cpython-314.pyc
+|           mandis.cpython-314.pyc
+|           orders.cpython-314.pyc
+|           payments.cpython-314.pyc
+|           predictions.cpython-314.pyc
+|           __init__.cpython-314.pyc
+|           
+\---__pycache__
+        auth.cpython-314.pyc
+        database.cpython-314.pyc
+        data_store.cpython-314.pyc
+        distance_service.cpython-314.pyc
+        import_historical_data.cpython-314.pyc
+        main.cpython-314.pyc
+        market_data.cpython-314.pyc
+        ml_engine.cpython-314.pyc
+        models.cpython-314.pyc
+        populate_mandi_locations.cpython-314.pyc
+        prepare_ml_data.cpython-314.pyc
+        train_forecast.cpython-314.pyc
+        train_forecast_backup.cpython-314.pyc
+        
